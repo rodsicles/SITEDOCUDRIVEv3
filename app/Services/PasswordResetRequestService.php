@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\DashboardLog;
 use App\Models\Notification;
 use App\Models\PasswordResetRequest;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -25,6 +26,66 @@ class PasswordResetRequestService
     public const RESULT_INACTIVE = 'inactive';
     public const RESULT_DEAN = 'dean';
     public const RESULT_DUPLICATE = 'duplicate';
+
+    /**
+     * Requester role => roles allowed to approve it. Nobody handles their own request.
+     * The Dean asks an Admin; an Admin asks the Dean; everyone else may ask the Dean office.
+     */
+    public const HANDLER_ROLES = [
+        Role::DEAN => [Role::ADMIN],
+        Role::ADMIN => [Role::DEAN],
+        Role::SECRETARY => [Role::DEAN, Role::SECRETARY, Role::ADMIN],
+        Role::COORDINATOR => [Role::DEAN, Role::SECRETARY, Role::ADMIN],
+        Role::FACULTY => [Role::DEAN, Role::SECRETARY, Role::ADMIN],
+    ];
+
+    /** @return list<string> */
+    public function handlerRolesFor(User $requester): array
+    {
+        return self::HANDLER_ROLES[$requester->role?->role_name] ?? [];
+    }
+
+    /** @return list<int> Active users who may approve this requester's reset. */
+    public function handlerIdsFor(User $requester): array
+    {
+        return User::where('status', 'Active')
+            ->whereKeyNot($requester->id)
+            ->whereHas('role', fn ($q) => $q->whereIn('role_name', $this->handlerRolesFor($requester)))
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    public function canHandle(PasswordResetRequest $request, User $handler): bool
+    {
+        $requester = $request->user;
+
+        return $requester
+            && (int) $requester->id !== (int) $handler->id
+            && in_array($handler->role?->role_name, $this->handlerRolesFor($requester), true);
+    }
+
+    /** Requests this handler is allowed to see and act on (never their own). */
+    public function handleableQuery(User $handler)
+    {
+        $requesterRoles = array_keys(array_filter(
+            self::HANDLER_ROLES,
+            fn (array $handlers) => in_array($handler->role?->role_name, $handlers, true)
+        ));
+
+        return PasswordResetRequest::query()
+            ->where('user_id', '!=', $handler->id)
+            ->whereHas('user.role', fn ($q) => $q->whereIn('role_name', $requesterRoles));
+    }
+
+    private function handlerLabel(User $handler): string
+    {
+        return match (true) {
+            $handler->isSecretary() => 'Secretary',
+            $handler->isAdmin() => 'Admin',
+            default => 'Dean',
+        };
+    }
 
     /**
      * Attempt to file a password reset request for the given username.
@@ -61,12 +122,13 @@ class PasswordResetRequestService
             return ['result' => self::RESULT_INACTIVE];
         }
 
-        // The Dean cannot route a reset through themselves — the public form
-        // is only for non-Dean roles. (Role 1 = Dean.)
-        if ($user->isDean()) {
+        // Requests need someone else who may approve them. The Dean's request goes to an
+        // active Admin; when no Admin exists the Dean must contact the system administrator.
+        $handlerIds = $this->handlerIdsFor($user);
+        if ($handlerIds === []) {
             DashboardLog::create([
                 'user_id'       => $user->id,
-                'activity'      => 'Password reset request for Dean username blocked: ' . $user->username,
+                'activity'      => 'Password reset request blocked (no available approver): ' . $user->username,
                 'activity_type' => 'password_reset_request_dean_blocked',
                 'visibility'    => 'dean',
                 'ip_address'    => $ip,
@@ -84,7 +146,7 @@ class PasswordResetRequestService
             return ['result' => self::RESULT_DUPLICATE];
         }
 
-        DB::transaction(function () use ($user, $ip) {
+        DB::transaction(function () use ($user, $ip, $handlerIds) {
             $request = PasswordResetRequest::create([
                 'user_id'      => $user->id,
                 'status'       => PasswordResetRequest::STATUS_PENDING,
@@ -95,20 +157,17 @@ class PasswordResetRequestService
             $userName = $user->employee->full_name ?? $user->username;
             $roleLabel = $user->role->role_name ?? 'User';
 
-            // Notify Dean (1) and Secretary (4) — Secretary mirrors Dean
-            // access throughout the system.
-            $supervisorIds = User::whereIn('role_id', [1, 4])->pluck('id')->toArray();
+            // Notify only the people who may approve this request.
             $now = now();
-            if (!empty($supervisorIds)) {
-                Notification::insert(array_map(fn ($deanId) => [
-                    'user_id' => $deanId,
-                    'message' => "{$userName} ({$roleLabel}) requested a password reset. Review it under Password Reset Requests.",
-                    'tone' => Notification::TONE_DANGER,
-                    'is_read' => false,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ], $supervisorIds));
-            }
+            Notification::insert(array_map(fn ($handlerId) => [
+                'user_id' => $handlerId,
+                'message' => "{$userName} ({$roleLabel}) requested a password reset. Review it under Password Reset Requests.",
+                'tone' => Notification::TONE_DANGER,
+                'action_url' => route('password-reset-requests.index'),
+                'is_read' => false,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ], $handlerIds));
 
             DashboardLog::create([
                 'user_id'       => $user->id,
@@ -128,8 +187,11 @@ class PasswordResetRequestService
      * password ONCE so the handler can hand it over in person. The plaintext
      * is never persisted.
      */
-    public function approve(PasswordResetRequest $request, User $handler): string
+    public function approve(PasswordResetRequest $request, User $handler, ?string $note = null): string
     {
+        abort_unless($this->canHandle($request, $handler), 403, 'You cannot handle this password reset request.');
+        $note = trim((string) $note);
+
         if ($request->status !== PasswordResetRequest::STATUS_PENDING) {
             throw new \RuntimeException('This request has already been handled.');
         }
@@ -139,9 +201,13 @@ class PasswordResetRequestService
             throw new \RuntimeException('This request has expired.');
         }
 
+        if ($request->user->isDean() && mb_strlen($note) < 5) {
+            throw new \RuntimeException('Enter a reason (at least 5 characters) before resetting the Dean account.');
+        }
+
         $tempPassword = $this->generateTempPassword();
 
-        DB::transaction(function () use ($request, $handler, $tempPassword) {
+        DB::transaction(function () use ($request, $handler, $tempPassword, $note) {
             $user = $request->user;
             $user->update([
                 'password'             => Hash::make($tempPassword),
@@ -153,20 +219,21 @@ class PasswordResetRequestService
                 'status'     => PasswordResetRequest::STATUS_APPROVED,
                 'handled_by' => $handler->id,
                 'handled_at' => now(),
-                'reason'     => null,
+                'reason'     => $note !== '' ? \Illuminate\Support\Str::limit($note, 255, '') : null,
             ]);
 
-            $handlerRole = $handler->isSecretary() ? 'Secretary' : 'Dean';
+            $handlerRole = $this->handlerLabel($handler);
+            $handlerName = $handler->employee->full_name ?? $handler->username;
             Notification::create([
                 'user_id' => $user->id,
-                'message' => "Your password reset request was approved by the {$handlerRole}. Please contact them to receive your temporary password. You will be required to set a new password on first login.",
+                'message' => "Your password was reset by the {$handlerRole} ({$handlerName}). Please contact them to receive your temporary password. You will be required to set a new password on first login.",
                 'tone'    => Notification::TONE_SUCCESS,
             ]);
 
             DashboardLog::create([
                 'user_id'        => $handler->id,
                 'target_user_id' => $user->id,
-                'activity'       => 'Approved password reset request for ' . $user->username,
+                'activity'       => \Illuminate\Support\Str::limit('Approved password reset request for ' . $user->username . ($note !== '' ? ' (reason: ' . $note . ')' : ''), 250),
                 'activity_type'  => 'password_reset_request_approved',
                 'visibility'     => 'dean',
             ]);
@@ -177,6 +244,8 @@ class PasswordResetRequestService
 
     public function deny(PasswordResetRequest $request, User $handler, ?string $reason = null): void
     {
+        abort_unless($this->canHandle($request, $handler), 403, 'You cannot handle this password reset request.');
+
         if ($request->status !== PasswordResetRequest::STATUS_PENDING) {
             throw new \RuntimeException('This request has already been handled.');
         }
@@ -194,7 +263,7 @@ class PasswordResetRequestService
             if ($reason) {
                 $message .= ' Reason: ' . $reason;
             }
-            $message .= ' Please contact the Dean directly if you need further assistance.';
+            $message .= ' Please contact the Dean or Admin directly if you need further assistance.';
 
             Notification::create([
                 'user_id' => $user->id,

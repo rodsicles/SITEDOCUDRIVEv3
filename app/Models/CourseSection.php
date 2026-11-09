@@ -12,7 +12,7 @@ class CourseSection extends Model
 
     public function scopeVisibleTo($query, User $user)
     {
-        if ($user->isDean()) return $query;
+        if ($user->hasOversightAccess()) return $query;
         if ($user->isProgramCoordinator()) return $query->whereIn('program', CoordinatorDepartment::requirePrograms($user));
         return $query->whereRaw('1 = 0');
     }

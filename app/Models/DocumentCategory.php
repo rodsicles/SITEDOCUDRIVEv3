@@ -23,7 +23,7 @@ class DocumentCategory extends Model
 
     public function canManage(User $user): bool
     {
-        return $this->created_by && ($this->owner_id ? (int) $this->owner_id === (int) $user->id : $user->isDean());
+        return $this->created_by && ($this->owner_id ? (int) $this->owner_id === (int) $user->id : $user->hasOversightAccess());
     }
 
     public function folders()

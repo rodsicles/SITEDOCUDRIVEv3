@@ -16,7 +16,7 @@ class UploadDestinationController extends Controller
     public function index(Request $request, FolderService $folders, AcademicHierarchyService $hierarchy)
     {
         $user = $request->user();
-        abort_unless($user->isFaculty() || $user->isProgramCoordinator() || $user->isDean(), 403);
+        abort_unless($user->isFaculty() || $user->isProgramCoordinator() || $user->hasOversightAccess(), 403);
         $request->validate(['folder' => 'nullable|integer']);
         return response()->json($this->describe($user, $request->filled('folder') ? (int) $request->folder : null, $folders, $hierarchy));
     }
@@ -50,7 +50,7 @@ class UploadDestinationController extends Controller
             'uploadable' => (bool) $uploadable,
             'academic' => $academic,
             'subjects' => $semester ? IteSubjects::labelsForUser($user) : [],
-            'url' => $folder ? route(($user->isDean() ? 'dean' : ($user->isProgramCoordinator() ? 'coordinator' : 'faculty')).'.documents', [
+            'url' => $folder ? route(($user->hasOversightAccess() ? 'dean' : ($user->isProgramCoordinator() ? 'coordinator' : 'faculty')).'.documents', [
                 'folder' => $folder->folder_id,
                 'tab' => (collect($folder->getAncestors())->first() ?? $folder)->tabKey(),
             ]) : null,

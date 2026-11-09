@@ -275,7 +275,7 @@ class DocumentSearchService
         $this->applyFilters($query, $user, $filters, null, null);
 
         $route = match (true) {
-            $user->isDean() || $user->isSecretary() => 'dean.documents',
+            $user->isDeanOrSecretary() => 'dean.documents',
             $user->isProgramCoordinator() => 'coordinator.documents',
             default => 'faculty.documents',
         };

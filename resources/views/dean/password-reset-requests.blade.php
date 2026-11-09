@@ -3,7 +3,7 @@
 @section('title', 'Password Reset Requests')
 
 @section('page-title', 'Password Reset Requests')
-@section('page-subtitle', 'Review and act on password reset requests from employees')
+@section('page-subtitle', 'Requests you are allowed to handle. The Dean\'s requests go to an Admin; an Admin\'s requests go to the Dean.')
 
 @section('sidebar')
     @if(auth()->user()->isSecretary())
@@ -137,8 +137,13 @@
                                 <form action="{{ route('password-reset-requests.approve', $req->password_reset_request_id) }}"
                                       method="POST"
                                       class="password-reset-approve-form"
-                                      data-username="{{ $req->user->username }}">
+                                      data-username="{{ $req->user->username }}"
+                                      data-requires-reason="{{ $req->user->isDean() ? '1' : '0' }}">
                                     @csrf
+                                    <input type="hidden" name="reason" value="">
+                                    @if($req->user->isDean())
+                                        <span class="badge badge-warning">Dean account</span>
+                                    @endif
                                     <button type="submit" class="btn btn-sm btn-primary">
                                         <i class="fas fa-check"></i> Approve
                                     </button>
@@ -197,6 +202,11 @@
             <div class="password-reset-confirm-dialog__note">
                 <i class="fas fa-shield-alt" aria-hidden="true"></i>
                 <span>The employee must change the temporary password after signing in.</span>
+            </div>
+            <div id="approveResetReasonGroup" class="form-group mt-3" hidden>
+                <label class="form-label" for="approveResetReason">Reason for resetting the Dean account (required)</label>
+                <textarea id="approveResetReason" class="form-control text-sm w-full" maxlength="255" rows="2" placeholder="e.g. Dean asked for help in person on Nov 9"></textarea>
+                <p id="approveResetReasonError" class="text-sm text-red-600 mt-1" hidden>Enter at least 5 characters.</p>
             </div>
             <div class="flex items-center gap-2 mt-4 justify-end">
                 <button type="button" id="approveResetCancel" class="btn btn-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
@@ -262,6 +272,9 @@ function openApproveResetModal(form) {
     var username = document.getElementById('approveResetUsername');
     pendingApproveForm = form;
     username.innerText = form.dataset.username || 'this employee';
+    document.getElementById('approveResetReasonGroup').hidden = form.dataset.requiresReason !== '1';
+    document.getElementById('approveResetReason').value = '';
+    document.getElementById('approveResetReasonError').hidden = true;
     modal.hidden = false;
     modal.classList.add('active');
     document.getElementById('approveResetConfirm').focus();
@@ -285,6 +298,13 @@ document.getElementById('approveResetCancel').addEventListener('click', closeApp
 document.getElementById('approveResetConfirm').addEventListener('click', function () {
     if (!pendingApproveForm) return;
     var form = pendingApproveForm;
+    var reason = document.getElementById('approveResetReason').value.trim();
+    if (form.dataset.requiresReason === '1' && reason.length < 5) {
+        document.getElementById('approveResetReasonError').hidden = false;
+        document.getElementById('approveResetReason').focus();
+        return;
+    }
+    form.querySelector('input[name="reason"]').value = reason;
     var button = this;
     button.disabled = true;
     button.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Approving...';

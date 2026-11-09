@@ -36,7 +36,7 @@ class GlobalSearchService
             $results[] = $row;
         }
 
-        if ($user->isDean() || $user->isProgramCoordinator()) {
+        if ($user->hasOversightAccess() || $user->isProgramCoordinator()) {
             foreach ($this->searchEmployees($user, $query, $limitPerGroup) as $row) {
                 $results[] = $row;
             }
@@ -107,8 +107,8 @@ class GlobalSearchService
                 $dept = $found->employee->program ?? null;
 
                 $url = match (true) {
-                    $user->isDean() && $found->employee => route('dean.employee-profile', $found->employee->employee_id),
-                    $user->isDean() => route('dean.employees'),
+                    $user->hasOversightAccess() && $found->employee => route('dean.employee-profile', $found->employee->employee_id),
+                    $user->hasOversightAccess() => route('dean.employees'),
                     $user->isProgramCoordinator() && $found->employee => route('coordinator.faculty-profile', $found->employee->employee_id),
                     $user->isProgramCoordinator() => route('coordinator.faculty'),
                     default => route('profile.edit'),
@@ -141,7 +141,7 @@ class GlobalSearchService
             ->limit($limit)
             ->get()
             ->map(function (Employee $employee) use ($user) {
-                $url = $user->isDean()
+                $url = $user->hasOversightAccess()
                     ? route('dean.employee-profile', $employee->employee_id)
                     : route('coordinator.faculty-profile', $employee->employee_id);
 
@@ -168,7 +168,7 @@ class GlobalSearchService
         }
 
         $url = match (true) {
-            $user->isDean() => route('dean.dashboard'),
+            $user->hasOversightAccess() => route('dean.dashboard'),
             $user->isProgramCoordinator() => route('coordinator.tasks'),
             $user->isFaculty() => route('faculty.tasks'),
             default => '#',

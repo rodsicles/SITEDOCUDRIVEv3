@@ -1,7 +1,9 @@
 {{-- Secretary Sidebar - Same access as Dean --}}
 @php
     try {
-        $pendingResetCount = \App\Models\PasswordResetRequest::pending()
+        $pendingResetCount = app(\App\Services\PasswordResetRequestService::class)
+            ->handleableQuery(auth()->user())
+            ->pending()
             ->where('expires_at', '>', now())
             ->count();
     } catch (\Throwable $e) {

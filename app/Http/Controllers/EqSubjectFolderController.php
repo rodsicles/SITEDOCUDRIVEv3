@@ -28,7 +28,7 @@ class EqSubjectFolderController extends Controller
         $subjectFolder = $hierarchy->ensureSubjectWithEqStructure($semester, $validated['subject']);
 
         $routeName = match (true) {
-            $user->isDean(), $user->isSecretary() => 'dean.documents',
+            $user->isDeanOrSecretary() => 'dean.documents',
             $user->isProgramCoordinator() => 'coordinator.documents',
             default => 'faculty.documents',
         };

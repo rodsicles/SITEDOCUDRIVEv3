@@ -112,7 +112,7 @@ class AnnouncementController extends Controller
         $user = auth()->user();
         $announcement = Announcement::where('announcement_id', $id)->firstOrFail();
 
-        if ($announcement->author_id !== $user->id && !$user->isDean()) {
+        if ($announcement->author_id !== $user->id && !$user->hasOversightAccess()) {
             abort(403);
         }
 
@@ -138,7 +138,7 @@ class AnnouncementController extends Controller
         $user = auth()->user();
         $announcement = Announcement::where('announcement_id', $id)->firstOrFail();
 
-        if ($announcement->author_id !== $user->id && !$user->isDean()) {
+        if ($announcement->author_id !== $user->id && !$user->hasOversightAccess()) {
             abort(403);
         }
 
@@ -234,7 +234,7 @@ class AnnouncementController extends Controller
     private function getRolePrefix(): string
     {
         $user = auth()->user();
-        if ($user->isDean() || $user->isSecretary()) return 'dean';
+        if ($user->isDeanOrSecretary()) return 'dean';
         if ($user->isProgramCoordinator()) return 'coordinator';
         return 'faculty';
     }

@@ -55,10 +55,10 @@ class DashboardLog extends Model
     {
         $query = self::with(['user.employee', 'targetUser.employee']);
 
-        if ($user->isDean()) {
-            // Dean sees everything
+        if ($user->hasOversightAccess()) {
+            // Dean and Admin see everything
             $query->latest('log_date');
-        } elseif ($user->role_id === 2) { // Program Coordinator
+        } elseif ($user->isProgramCoordinator()) {
             $coordinatorDept = \App\Support\CoordinatorDepartment::programs($user);
 
             if (!$coordinatorDept) {
@@ -71,7 +71,7 @@ class DashboardLog extends Model
                     $q->where('user_id', $user->id)
                         ->orWhere('target_user_id', $user->id)
                         ->orWhereHas('user', function ($subQ) use ($coordinatorDept) {
-                            $subQ->where('role_id', 3)
+                            $subQ->whereHas('role', fn ($r) => $r->where('role_name', Role::FACULTY))
                                 ->whereHas('employee', function ($empQ) use ($coordinatorDept) {
                                     $empQ->whereIn('program', $coordinatorDept);
                                 });
@@ -123,11 +123,11 @@ class DashboardLog extends Model
     {
         $query = self::query();
 
-        if ($user->isDean()) {
+        if ($user->hasOversightAccess()) {
             return $query;
         }
 
-        if ($user->role_id === 2) {
+        if ($user->isProgramCoordinator()) {
             $coordinatorDept = \App\Support\CoordinatorDepartment::programs($user);
 
             if (!$coordinatorDept) {

@@ -279,7 +279,7 @@ class CoordinatorController extends Controller
             ->where('employee_id', $id)
             ->firstOrFail();
 
-        if ($employee->user->role_id !== 3) {
+        if (!$employee->user->isFaculty()) {
             abort(403, 'Unauthorized access');
         }
 
@@ -297,7 +297,7 @@ class CoordinatorController extends Controller
             ->where('employee_id', $id)
             ->firstOrFail();
 
-        if ($employee->user->role_id !== 3) {
+        if (!$employee->user->isFaculty()) {
             abort(403, 'Unauthorized access');
         }
 
@@ -331,7 +331,7 @@ class CoordinatorController extends Controller
             ->where('employee_id', $id)
             ->firstOrFail();
 
-        if ($employee->user->role_id !== 3) {
+        if (!$employee->user->isFaculty()) {
             abort(403, 'Unauthorized access');
         }
 
@@ -358,7 +358,7 @@ class CoordinatorController extends Controller
             ->where('employee_id', $id)
             ->firstOrFail();
 
-        if ($employee->user->role_id !== 3) {
+        if (!$employee->user->isFaculty()) {
             abort(403, 'Unauthorized access');
         }
 

@@ -26,7 +26,7 @@ class TeacherLoad extends Model
 
     public function scopeVisibleTo($query, User $viewer)
     {
-        if ($viewer->isDean()) return $query;
+        if ($viewer->hasOversightAccess()) return $query;
         if ($viewer->isProgramCoordinator()) {
             return $query->whereIn('program', \App\Support\CourseCatalog::programsForUser($viewer));
         }

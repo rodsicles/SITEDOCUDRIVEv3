@@ -7,13 +7,16 @@
     $isDean = $user->isDean();
     $isSecretary = $user->isSecretary();
     $isDeanOrSecretary = $user->isDeanOrSecretary();
-    $guideSubtitle = $isDean
+    $isAdmin = $user->isAdmin();
+    $guideSubtitle = $isAdmin
+        ? 'Step-by-step guide for the Admin Dashboard'
+        : ($isDean
         ? 'Step-by-step guide for the Dean Dashboard'
         : ($isCoordinator
             ? 'Step-by-step guide for the Program Coordinator Dashboard'
             : ($isSecretary
                 ? 'Step-by-step guide for the Secretary Dashboard'
-                : 'Step-by-step guide for the Faculty Dashboard'));
+                : 'Step-by-step guide for the Faculty Dashboard')));
 @endphp
 
 @section('title', 'User Guide')
@@ -21,13 +24,15 @@
 @section('page-subtitle', $guideSubtitle)
 
 @php
-    $guideWelcomeSub = $isDean
+    $guideWelcomeSub = $isAdmin
+        ? 'As Admin you handle day-to-day oversight across all programs: faculty accounts, Course Catalog, Recycle Bin, Rejected Files, Activity Log, approvals, and password help. Backups, permanent deletes, school-year archiving, and Coordinator/Admin accounts stay with the Dean.'
+        : ($isDean
         ? 'This guide covers Dean tools: approvals, faculty oversight, documents, announcements, analytics, and archives. Follow the steps below for your dashboard.'
         : ($isCoordinator
             ? 'This guide covers Program Coordinator features for your program. Follow the steps below to use your dashboard effectively.'
             : ($isSecretary
                 ? 'This guide covers Secretary features that support Dean office operations. Follow the steps below to use your dashboard effectively.'
-                : 'This guide covers Faculty features for tasks, uploads, and approvals. Follow the steps below to use your dashboard effectively.'));
+                : 'This guide covers Faculty features for tasks, uploads, and approvals. Follow the steps below to use your dashboard effectively.')));
 @endphp
 
 @section('page-header-extra')
@@ -242,7 +247,7 @@
         <li>Unread items are marked with a <strong>blue dot</strong> and are auto-marked read after you view them for about 1.5 seconds.</li>
         <li>Click <strong>Mark as read</strong> to clear an item immediately.</li>
         <li>Read <strong>pinned</strong> announcements first — they stay at the top with a pin icon and highlighted border.</li>
-        @if($isDean || $isCoordinator)
+        @if($isDean || $isAdmin || $isCoordinator)
         <li>Use the <strong>composer</strong> at the top of the feed (or <strong>Post Announcement</strong>) to publish. Choose audience, write the message, set optional expiry, then post.</li>
         <li>Use the <strong>three-dot menu (⋮)</strong> on your own posts to edit or delete them.</li>
         @endif
@@ -307,6 +312,12 @@
         <li>On the profile, use <strong>Browse by Folder</strong> (Expand all / Collapse all) to inspect Teaching Guides and Exam Questionnaires. Each file shows its <strong>file name</strong>, status, folder path, and date.</li>
         <li>Click <strong>Edit</strong> on a profile to update employee information.</li>
         <li>Use <strong>search or filters</strong> to find someone by name or program.</li>
+        <li>Use <strong>Create Admin</strong> to add an Admin who handles day-to-day oversight when you are busy. Only you can create, deactivate, or reset Admin accounts.</li>
+        <li>If you forget your own password, use <strong>Forgot Password</strong> on the login page; an Admin will give you a temporary password.</li>
+        @elseif($isAdmin)
+        <li>Use <strong>Create Faculty</strong> to add faculty accounts. Coordinator and Admin accounts are created by the Dean.</li>
+        <li>On a faculty profile, use <strong>Edit</strong>, <strong>Deactivate</strong>, or <strong>Generate temporary password</strong> when a faculty member forgets their password. The password is shown once; give it to them in person.</li>
+        <li>Open <strong>Password Resets</strong> to approve Forgot Password requests from faculty, coordinators, and the Dean. A reason is required before resetting the Dean's password.</li>
         @elseif($isCoordinator)
         <li>Coordinators can view profiles but manage accounts through the Dean when changes are required.</li>
         @else

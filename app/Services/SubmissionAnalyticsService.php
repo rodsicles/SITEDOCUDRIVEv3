@@ -340,7 +340,7 @@ class SubmissionAnalyticsService
             $parts[] = $filters['semester'] . ' Semester';
         }
 
-        if ($viewer->isDean() || $viewer->isSecretary()) {
+        if ($viewer->isDeanOrSecretary()) {
             $parts[] = $filters['program'] ?: 'All Departments';
         } elseif ($viewer->isProgramCoordinator()) {
             $parts[] = $filters['program'] ?: implode(', ', \App\Support\CoordinatorDepartment::programs($viewer));

@@ -18,7 +18,7 @@ class TeacherLoadService
                     ->whereHas('role', fn ($r) => $r->whereIn('role_name', ['Faculty Employee', 'Program Coordinator']));
             });
 
-        if (! $actor->isDean()) {
+        if (! $actor->hasOversightAccess()) {
             $query->whereIn('program', \App\Support\CourseCatalog::programsForUser($actor) ?? ['__unassigned__']);
         }
 
@@ -64,7 +64,7 @@ class TeacherLoadService
 
     public function validate(User $actor, array $input, ?TeacherLoad $load = null, bool $finalizing = false): array
     {
-        abort_unless($actor->isDean() || $actor->isProgramCoordinator(), 403);
+        abort_unless($actor->hasOversightAccess() || $actor->isProgramCoordinator(), 403);
         $data = validator($input, [
             'employee_id' => ['required', 'integer'],
             'school_year_id' => ['required', 'integer', 'exists:school_years,id'],
@@ -220,7 +220,7 @@ class TeacherLoadService
 
     public function change(User $actor, int $id, string $action, int $version, string $reason): ?TeacherLoad
     {
-        abort_unless($actor->isDean() || $actor->isProgramCoordinator(), 403);
+        abort_unless($actor->hasOversightAccess() || $actor->isProgramCoordinator(), 403);
         return DB::transaction(function () use ($actor, $id, $action, $version, $reason) {
             $load = TeacherLoad::visibleTo($actor)->with('items')->lockForUpdate()->findOrFail($id);
             abort_if($load->schoolYear->isArchived(), 422, 'Archived teaching loads are read-only.');

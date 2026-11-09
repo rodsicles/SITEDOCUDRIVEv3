@@ -3,7 +3,7 @@
 @section('page-title', 'Manage document request')
 @section('page-subtitle', $documentRequest->title)
 @section('sidebar')
-    @include(auth()->user()->isDean() ? 'partials.dean-sidebar' : 'partials.coordinator-sidebar')
+    @include(auth()->user()->hasOversightAccess() ? 'partials.dean-sidebar' : 'partials.coordinator-sidebar')
 @endsection
 @section('content')
 <a class="btn btn-secondary mb-4" href="{{ route('document-requests.index', ['tab' => 'sent']) }}">Back to sent requests</a>

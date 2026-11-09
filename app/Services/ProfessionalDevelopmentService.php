@@ -69,7 +69,7 @@ class ProfessionalDevelopmentService
             ]);
 
             // Notify supervisors
-            $supervisors = User::whereIn('role_id', [1, 2])->get();
+            $supervisors = User::whereHas('role', fn ($q) => $q->whereIn('role_name', [\App\Models\Role::DEAN, \App\Models\Role::COORDINATOR, \App\Models\Role::ADMIN]))->get();
             $employeeName = $user->employee->full_name ?? $user->username;
             foreach ($supervisors as $supervisor) {
                 Notification::create([

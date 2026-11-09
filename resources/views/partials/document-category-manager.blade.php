@@ -22,7 +22,7 @@
                 <div class="form-group"><label class="form-label" for="managedCategoryName">Category name *</label><input id="managedCategoryName" name="category_name" class="form-control" maxlength="80" required placeholder="e.g. Research Outputs"></div>
                 <div class="form-group"><label class="form-label" for="managedCategoryDescription">Description <span class="text-xs">(optional)</span></label><textarea id="managedCategoryDescription" name="description" class="form-control" maxlength="500" rows="3"></textarea></div>
                 <div class="form-group" id="categoryScopeGroup">
-                    @if(auth()->user()->isDean())
+                    @if(auth()->user()->hasOversightAccess())
                     <label class="form-label" for="managedCategoryScope">Visibility *</label><select name="scope" id="managedCategoryScope" class="form-control"><option value="personal">Personal — only me</option><option value="system">System-wide — available to all roles</option></select>
                     <p class="text-xs mt-2">File access still follows existing permissions. Visibility cannot be changed after creation.</p>
                     @else

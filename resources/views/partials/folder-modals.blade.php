@@ -246,7 +246,7 @@ async function handleCreateFolder(event) {
     const formData = new FormData(form);
 
     try {
-        const response = await fetch('{{ route(auth()->user()->isDean() ? "dean.folders.store" : (auth()->user()->isProgramCoordinator() ? "coordinator.folders.store" : "faculty.folders.store")) }}', {
+        const response = await fetch('{{ route(auth()->user()->isDeanOrSecretary() ? "dean.folders.store" : (auth()->user()->isProgramCoordinator() ? "coordinator.folders.store" : "faculty.folders.store")) }}', {
             method: 'POST',
             headers: {
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
@@ -317,7 +317,7 @@ async function handleRenameFolder(event) {
     const folderId = folderIdInput.value;
 
     try {
-        const route = '{{ url("/") }}/' + '{{ auth()->user()->isDean() ? "dean" : (auth()->user()->isProgramCoordinator() ? "coordinator" : "faculty") }}' + '/folders/' + folderId;
+        const route = '{{ url("/") }}/' + '{{ auth()->user()->isDeanOrSecretary() ? "dean" : (auth()->user()->isProgramCoordinator() ? "coordinator" : "faculty") }}' + '/folders/' + folderId;
 
         const response = await fetch(route, {
             method: 'POST',
@@ -363,7 +363,7 @@ async function deleteFolder(folderId, folderName) {
     }
     
     try {
-        const route = '{{ url("/") }}/' + '{{ auth()->user()->isDean() ? "dean" : (auth()->user()->isProgramCoordinator() ? "coordinator" : "faculty") }}' + '/folders/' + folderId;
+        const route = '{{ url("/") }}/' + '{{ auth()->user()->isDeanOrSecretary() ? "dean" : (auth()->user()->isProgramCoordinator() ? "coordinator" : "faculty") }}' + '/folders/' + folderId;
         
         const response = await fetch(route, {
             method: 'DELETE',
@@ -414,7 +414,7 @@ async function handleMoveDocument(event) {
     const folderId = folderIdInput ? folderIdInput.value : '';
 
     try {
-        const route = '{{ url("/") }}/' + '{{ auth()->user()->isDean() ? "dean" : (auth()->user()->isProgramCoordinator() ? "coordinator" : "faculty") }}' + '/documents/' + documentId + '/move';
+        const route = '{{ url("/") }}/' + '{{ auth()->user()->isDeanOrSecretary() ? "dean" : (auth()->user()->isProgramCoordinator() ? "coordinator" : "faculty") }}' + '/documents/' + documentId + '/move';
 
         const response = await fetch(route, {
             method: 'POST',

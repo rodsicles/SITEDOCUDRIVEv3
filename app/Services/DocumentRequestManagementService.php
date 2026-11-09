@@ -13,7 +13,7 @@ class DocumentRequestManagementService
 {
     public function authorize(User $actor, DocumentRequest $item): void
     {
-        abort_unless(($actor->isDean() || $actor->isProgramCoordinator()) && (int) $item->requested_by === (int) $actor->id, 403);
+        abort_unless(($actor->hasOversightAccess() || $actor->isProgramCoordinator()) && (int) $item->requested_by === (int) $actor->id, 403);
     }
 
     public function eligiblePeople(User $actor)

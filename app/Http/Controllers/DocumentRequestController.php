@@ -52,7 +52,7 @@ class DocumentRequestController extends Controller
         }
 
         $requests = $query->orderByRaw('CASE WHEN due_at IS NULL THEN 1 ELSE 0 END')->orderBy('due_at')->latest('id')->paginate(20)->withQueryString();
-        $canCreateRequests = $user->isDean() || $user->isProgramCoordinator();
+        $canCreateRequests = $user->hasOversightAccess() || $user->isProgramCoordinator();
         $people = $canCreateRequests ? app(\App\Services\DocumentRequestManagementService::class)->eligiblePeople($user)
             ->with(['assignedCourses' => fn ($query) => $query->active()->ordered()])->orderBy('username')->get() : collect();
         $courses = Course::active()->ordered()->get();
@@ -71,7 +71,7 @@ class DocumentRequestController extends Controller
 
     public function recipients(Request $request)
     {
-        abort_unless($request->user()->isDean() || $request->user()->isProgramCoordinator(), 403);
+        abort_unless($request->user()->hasOversightAccess() || $request->user()->isProgramCoordinator(), 403);
         $people = app(\App\Services\DocumentRequestManagementService::class)->eligiblePeople($request->user())
             ->with(['assignedCourses' => fn ($query) => $query->active()->ordered()])->orderBy('username')->get();
 
@@ -87,7 +87,7 @@ class DocumentRequestController extends Controller
 
     public function store(Request $request)
     {
-        abort_unless($request->user()->isDean() || $request->user()->isProgramCoordinator(), 403, 'Only deans and program coordinators can create document requests.');
+        abort_unless($request->user()->hasOversightAccess() || $request->user()->isProgramCoordinator(), 403, 'Only the Dean, Admin, and program coordinators can create document requests.');
 
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:150'],

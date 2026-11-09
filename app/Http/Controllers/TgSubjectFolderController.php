@@ -28,7 +28,7 @@ class TgSubjectFolderController extends Controller
         $subjectFolder = $hierarchy->ensureSubjectWithTgLb($semester, $validated['subject']);
 
         $routeName = match (true) {
-            $user->isDean(), $user->isSecretary() => 'dean.documents',
+            $user->isDeanOrSecretary() => 'dean.documents',
             $user->isProgramCoordinator() => 'coordinator.documents',
             default => 'faculty.documents',
         };

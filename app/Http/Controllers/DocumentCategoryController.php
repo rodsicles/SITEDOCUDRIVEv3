@@ -16,9 +16,9 @@ class DocumentCategoryController extends Controller
 {
     public function store(Request $request)
     {
-        abort_unless($request->user()->isDean() || $request->user()->isFaculty() || $request->user()->isProgramCoordinator(), 403);
+        abort_unless($request->user()->hasOversightAccess() || $request->user()->isFaculty() || $request->user()->isProgramCoordinator(), 403);
         $data = $request->validate(['category_name' => 'required|string|max:80', 'description' => 'nullable|string|max:500', 'scope' => ['required', Rule::in(['personal', 'system'])]]);
-        abort_if($data['scope'] === 'system' && ! $request->user()->isDean(), 403);
+        abort_if($data['scope'] === 'system' && ! $request->user()->hasOversightAccess(), 403);
         $owner = $data['scope'] === 'personal' ? $request->user()->id : null;
         $scope = $owner ? 'user-'.$owner : 'system';
         $name = $this->validateName($data['category_name'], $scope);

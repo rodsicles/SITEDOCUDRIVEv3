@@ -175,6 +175,21 @@ class User extends Authenticatable
         return $this->role->role_name === 'Secretary';
     }
 
+    public function isAdmin(): bool
+    {
+        return $this->role?->role_name === Role::ADMIN;
+    }
+
+    /**
+     * Dean or Admin: day-to-day oversight across every program (Teacher's Load,
+     * course sections, document requests, announcements). Dean-only actions
+     * such as backups, purges and school-year archiving keep using isDean().
+     */
+    public function hasOversightAccess(): bool
+    {
+        return $this->isDean() || $this->isAdmin();
+    }
+
     /**
      * The user's own program, plus any extra programs a coordinator handles.
      *
@@ -191,14 +206,18 @@ class User extends Authenticatable
         return $program ? [$program] : [];
     }
 
+    /**
+     * Dean office access shared by Dean, Secretary and Admin (all-program visibility,
+     * review queues, /dean routes). Use isDean() for actions reserved to the Dean.
+     */
     public function isDeanOrSecretary()
     {
-        return $this->isDean() || $this->isSecretary();
+        return $this->isDean() || $this->isSecretary() || $this->isAdmin();
     }
 
     public function canManageDocuments()
     {
-        return $this->isDean() || $this->isSecretary() || $this->isProgramCoordinator();
+        return $this->isDeanOrSecretary() || $this->isProgramCoordinator();
     }
 
     public function canUploadSharedDocuments(): bool

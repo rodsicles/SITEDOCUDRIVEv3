@@ -3,7 +3,7 @@
 @section('page-title', "Teacher's Load history")
 @section('page-subtitle', $load->faculty_name.' · '.$load->academic_year.' · '.\App\Support\SchoolTerm::label($load->semester))
 @section('sidebar')
-    @include(auth()->user()->isDean() ? 'partials.dean-sidebar' : (auth()->user()->isProgramCoordinator() ? 'partials.coordinator-sidebar' : 'partials.faculty-sidebar'))
+    @include(auth()->user()->hasOversightAccess() ? 'partials.dean-sidebar' : (auth()->user()->isProgramCoordinator() ? 'partials.coordinator-sidebar' : 'partials.faculty-sidebar'))
 @endsection
 @section('content')
 <a href="{{ route('teacher-loads.index') }}" class="btn btn-secondary mb-4">Back to teaching loads</a>

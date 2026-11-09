@@ -418,7 +418,7 @@ class EngagementAnalyticsService
     {
         $parts = [AcademicYear::label((int) $filters['school_year'])];
 
-        if ($viewer->isDean() || $viewer->isSecretary()) {
+        if ($viewer->isDeanOrSecretary()) {
             $parts[] = $filters['program'] ?: 'All Departments';
         } elseif ($viewer->isProgramCoordinator()) {
             $parts[] = $filters['program'] ?: implode(', ', \App\Support\CoordinatorDepartment::programs($viewer));

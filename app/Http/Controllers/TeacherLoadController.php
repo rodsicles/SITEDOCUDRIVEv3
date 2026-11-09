@@ -17,7 +17,7 @@ class TeacherLoadController extends Controller
     public function index(Request $request)
     {
         $viewer = $request->user();
-        $manager = $viewer->isDean() || $viewer->isProgramCoordinator();
+        $manager = $viewer->hasOversightAccess() || $viewer->isProgramCoordinator();
         $filters = $request->validate([
             'program' => ['nullable', Rule::in(Program::codes())],
             'school_year_id' => ['nullable', 'integer', 'exists:school_years,id'],
@@ -46,14 +46,14 @@ class TeacherLoadController extends Controller
             ? app(\App\Services\TeachingAssignmentService::class)->current($assignmentTeacher, $filters['semester'] ?? null)
             : null;
         $manageSubjectsUrl = $manager && $assignmentTeacher && ($viewer->isDean() || $assignmentTeacher->isFaculty())
-            ? route($viewer->isDean() ? 'dean.edit-employee' : 'coordinator.edit-faculty', $assignmentTeacher->employee->employee_id)
+            ? route($viewer->hasOversightAccess() ? 'dean.edit-employee' : 'coordinator.edit-faculty', $assignmentTeacher->employee->employee_id)
             : null;
         return view('teacher-loads.index', compact('loads', 'faculty', 'years', 'manager', 'filters', 'teachingAssignments', 'manageSubjectsUrl', 'draftCount'));
     }
 
     private function manager(Request $request): void
     {
-        abort_unless($request->user()->isDean() || $request->user()->isProgramCoordinator(), 403);
+        abort_unless($request->user()->hasOversightAccess() || $request->user()->isProgramCoordinator(), 403);
     }
 
     private function find(Request $request, int $id): TeacherLoad
@@ -89,7 +89,7 @@ class TeacherLoadController extends Controller
     private function editingData(TeacherLoad $load, Request $request): array
     {
         $data = $load->toArray();
-        if (($request->user()->isDean() || $request->user()->isProgramCoordinator()) && $load->revision_draft !== null) {
+        if (($request->user()->hasOversightAccess() || $request->user()->isProgramCoordinator()) && $load->revision_draft !== null) {
             $data = array_replace($data, $load->revision_draft['header'], ['items' => $load->revision_draft['items'],
                 'id' => $load->id, 'lock_version' => $load->lock_version, 'editing_revision' => true]);
         }

@@ -449,7 +449,7 @@ class DocumentService
             $folder = $hierarchy->ensureCourseFolder($folder, $subject);
             $validated['folder_id'] = $folder->folder_id;
         }
-        $autoApprove = $uploader->isDean() || $uploader->isSecretary();
+        $autoApprove = $uploader->isDeanOrSecretary();
         $submittedForApproval = false;
 
         $uploadedCount = 0;
@@ -705,7 +705,7 @@ class DocumentService
             return false;
         }
 
-        if ($user->isDean() || $user->isSecretary()) {
+        if ($user->isDeanOrSecretary()) {
             return true;
         }
 
@@ -788,7 +788,7 @@ class DocumentService
 
         abort_unless($document->canView($user), 404);
 
-        if (!($user->isDean() || $user->isSecretary() || $document->uploaded_by === $user->id)) {
+        if (!($user->isDeanOrSecretary() || (int) $document->uploaded_by === (int) $user->id)) {
             abort(403, 'Unauthorized');
         }
 

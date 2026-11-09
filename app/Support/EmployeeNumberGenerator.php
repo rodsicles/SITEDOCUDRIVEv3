@@ -10,6 +10,8 @@ class EmployeeNumberGenerator
 
     public const ROLE_COORDINATOR = 'COOR';
 
+    public const ROLE_ADMIN = 'ADMIN';
+
     public function departmentCode(string $department): string
     {
         return in_array($department, \App\Models\Program::codes(), true) ? strtoupper($department) : 'GEN';

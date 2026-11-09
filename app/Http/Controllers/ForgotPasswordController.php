@@ -25,7 +25,7 @@ class ForgotPasswordController extends Controller
                 'Dean'                => redirect()->route('dean.dashboard'),
                 'Program Coordinator' => redirect()->route('coordinator.dashboard'),
                 'Faculty Employee'    => redirect()->route('faculty.dashboard'),
-                'Secretary'           => redirect()->route('dean.dashboard'),
+                'Secretary', 'Admin'  => redirect()->route('dean.dashboard'),
                 default               => redirect()->route('login'),
             };
         }
@@ -64,7 +64,7 @@ class ForgotPasswordController extends Controller
                 ->withInput($request->only('username')),
 
             PasswordResetRequestService::RESULT_INACTIVE => back()
-                ->withErrors(['username' => 'This account is inactive. Please contact the Dean directly.'])
+                ->withErrors(['username' => 'This account is inactive. Please contact the Dean or Admin directly.'])
                 ->withInput($request->only('username')),
 
             PasswordResetRequestService::RESULT_DEAN => back()
@@ -73,11 +73,11 @@ class ForgotPasswordController extends Controller
 
             PasswordResetRequestService::RESULT_DUPLICATE => redirect()
                 ->route('password.forgot.show')
-                ->with('info', 'A reset request is already pending review. Please wait for the Dean to act on it.'),
+                ->with('info', 'A reset request is already pending review. Please wait for the Dean or Admin to act on it.'),
 
             default => redirect()
                 ->route('password.forgot.show')
-                ->with('success', 'Your request was sent to the Dean. You will be notified when it is reviewed.'),
+                ->with('success', 'Your request was sent for review. The Dean or Admin will give you a temporary password in person.'),
         };
     }
 }

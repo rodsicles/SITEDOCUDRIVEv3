@@ -36,9 +36,13 @@
             </div>
 
             <div class="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4">
+                @if($canManageArchives ?? true)
                 <button type="button" class="btn btn-danger border-0" data-dialog-open="archiveModal">
                     <i class="fas fa-archive"></i> Archive This School Year
                 </button>
+                @else
+                <p class="text-sm text-gray-600 dark:text-gray-300"><i class="fas fa-lock mr-1"></i> Archiving the school year is done by the Dean.</p>
+                @endif
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
                     Documents for this year are archived in full. Only <strong>approved</strong> teaching guides and exam questionnaires are kept in the archive; pending and rejected submissions stay in the active year for review or faculty cleanup.
                 </p>
@@ -115,12 +119,14 @@
                             <a href="{{ route('dean.archives.show', $year->id) }}" class="btn btn-sm btn-primary border-0">
                                 <i class="fas fa-eye"></i> Browse
                             </a>
+                            @if($canManageArchives ?? true)
                             <button type="button"
                                     class="btn btn-sm btn-success border-0 js-archive-restore-open"
                                     data-restore-url="{{ route('dean.archives.restore', $year) }}"
                                     data-restore-name="{{ $year->name }}">
                                 <i class="fas fa-undo"></i> Restore as Active
                             </button>
+                            @endif
                             @if($allowArchiveHardDelete)
                             <button type="button"
                                     class="btn btn-sm btn-danger border-0 js-archive-delete-open"

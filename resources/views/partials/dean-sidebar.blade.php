@@ -1,7 +1,9 @@
-{{-- Consistent Dean Sidebar - Appears on ALL Dean Pages --}}
+{{-- Consistent Dean Sidebar - Appears on ALL Dean and Admin pages --}}
 @php
     try {
-        $pendingResetCount = \App\Models\PasswordResetRequest::pending()
+        $pendingResetCount = app(\App\Services\PasswordResetRequestService::class)
+            ->handleableQuery(auth()->user())
+            ->pending()
             ->where('expires_at', '>', now())
             ->count();
     } catch (\Throwable $e) {
@@ -43,6 +45,11 @@
         <a href="{{ route('dean.recycle-bin.index') }}" class="menu-item {{ request()->routeIs('dean.recycle-bin.*') ? 'active' : '' }}">
             <i class="fas fa-recycle"></i> Recycle Bin
         </a>
+        @if(auth()->user()->hasOversightAccess())
+        <a href="{{ route('dean.rejected-files.index') }}" class="menu-item {{ request()->routeIs('dean.rejected-files.*') ? 'active' : '' }}">
+            <i class="fas fa-circle-xmark"></i> Rejected Files
+        </a>
+        @endif
     </div>
 </div>
 

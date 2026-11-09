@@ -132,6 +132,47 @@ class EmployeeService
     }
 
     /**
+     * Create an Admin account (Dean only). Admins cover every program, so no home program is stored.
+     */
+    public function createAdmin(array $validated, int $creatorUserId): Employee
+    {
+        return DB::transaction(function () use ($validated, $creatorUserId) {
+            $user = User::create([
+                'role_id' => \App\Models\Role::idFor(\App\Models\Role::ADMIN),
+                'name' => $validated['full_name'],
+                'username' => $validated['username'],
+                'email' => null,
+                'password' => Hash::make($validated['password']),
+                'status' => 'Active',
+                'must_change_password' => true,
+                'password_changed_at' => null,
+            ]);
+
+            $employee = Employee::create([
+                'user_id' => $user->id,
+                'employee_no' => app(EmployeeNumberGenerator::class)->next('', EmployeeNumberGenerator::ROLE_ADMIN),
+                'full_name' => $validated['full_name'],
+                'first_name' => $validated['first_name'] ?? null,
+                'middle_name' => $validated['middle_name'] ?? null,
+                'last_name' => $validated['last_name'] ?? null,
+                'department' => \App\Models\Program::DEPARTMENT_NAME,
+                'position' => 'Admin',
+                'hire_date' => now(),
+            ]);
+
+            DashboardLog::create([
+                'user_id' => $creatorUserId,
+                'target_user_id' => $user->id,
+                'activity' => \Illuminate\Support\Str::limit('Created Admin account: '.$validated['full_name'], 250),
+                'activity_type' => 'account_created',
+                'visibility' => 'dean',
+            ]);
+
+            return $employee;
+        });
+    }
+
+    /**
      * Update a faculty member's information in a transaction.
      */
     public function updateFaculty(Employee $employee, array $validated, int $updaterUserId): Employee
@@ -214,7 +255,7 @@ class EmployeeService
                 'position' => $validated['position'] ?? $employee->position,
                 'hire_date' => $validated['hire_date'] ?? $employee->hire_date,
             ] + $this->namePartsForUpdate($employee, $validated));
-            if ((int) $employee->user->role_id === 2) {
+            if ($employee->user->isProgramCoordinator()) {
                 $employee->syncExtraPrograms($validated['extra_programs'] ?? []);
             }
 
@@ -253,8 +294,16 @@ class EmployeeService
 
         $user = $employee->user;
 
-        if ($user->role_id === 1) {
+        if ($user->isDean()) {
             abort(403, 'Cannot change status for Dean accounts.');
+        }
+
+        if ($user->isAdmin() && !$actor->isDean()) {
+            abort(403, 'Only the Dean can change the status of Admin accounts.');
+        }
+
+        if ($actor->isAdmin() && !$user->isFaculty()) {
+            abort(403, 'Admins can only manage Faculty accounts.');
         }
 
         if ($actor->id === $user->id && $status === 'Inactive') {
@@ -308,7 +357,7 @@ class EmployeeService
 
         Notification::create([
             'user_id' => $employee->user_id,
-            'message' => 'Your password has been reset by ' . ($resetter->employee->full_name ?? 'Dean') . '. Please use your new password to login.',
+            'message' => 'Your password has been reset by ' . ($resetter->employee->full_name ?? ($resetter->isAdmin() ? 'Admin' : 'Dean')) . '. Please use your new password to login.',
         ]);
 
         DashboardLog::create([

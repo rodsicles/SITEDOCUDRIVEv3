@@ -1,7 +1,7 @@
 @php
     $eFilters = $engagementFilters ?? [];
     $isFaculty = auth()->user()->isFaculty();
-    $isDeanOrSec = auth()->user()->isDean() || auth()->user()->isSecretary();
+    $isDeanOrSec = auth()->user()->isDeanOrSecretary();
     $maxWeekly = max(($weeklyTrend ?? collect())->max('actions') ?: 1, 1);
 @endphp
 

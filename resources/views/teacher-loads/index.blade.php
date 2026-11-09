@@ -5,7 +5,7 @@
 @section('page-subtitle', $manager ? 'Prepare faculty workloads and export the registrar form' : 'View and download your finalized teaching loads')
 
 @section('sidebar')
-    @include(auth()->user()->isDean() ? 'partials.dean-sidebar' : (auth()->user()->isProgramCoordinator() ? 'partials.coordinator-sidebar' : 'partials.faculty-sidebar'))
+    @include(auth()->user()->hasOversightAccess() ? 'partials.dean-sidebar' : (auth()->user()->isProgramCoordinator() ? 'partials.coordinator-sidebar' : 'partials.faculty-sidebar'))
 @endsection
 
 @push('styles')
@@ -36,7 +36,7 @@
     </button>
     <form class="tl-filters {{ $activeLoadFilters ? '' : 'is-collapsed-mobile' }}" id="tl-filters" method="GET">
         @if(($filters['view'] ?? '') === 'drafts')<input type="hidden" name="view" value="drafts">@endif
-        @if(auth()->user()->isDean())
+        @if(auth()->user()->hasOversightAccess())
         <label>Program<select name="program" class="form-control"><option value="">All programs</option>
             @foreach(\App\Models\Program::codes() as $code)<option value="{{ $code }}" @selected(($filters['program'] ?? '') === $code)>{{ $code }}</option>@endforeach
         </select></label>

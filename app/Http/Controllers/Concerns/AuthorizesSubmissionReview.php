@@ -11,7 +11,7 @@ trait AuthorizesSubmissionReview
     {
         $user = auth()->user();
 
-        if (!$user->isDean() && !$user->isSecretary() && !$user->isProgramCoordinator()) {
+        if (!$user->isDeanOrSecretary() && !$user->isProgramCoordinator()) {
             abort(403, 'You are not allowed to review submissions.');
         }
 

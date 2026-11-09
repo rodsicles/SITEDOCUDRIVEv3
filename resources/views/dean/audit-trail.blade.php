@@ -22,20 +22,22 @@
                 Activity Log
                 <span class="badge badge-info ml-2">{{ number_format($logs->total()) }} records</span>
             </h3>
-            @if(auth()->user()->isDean())
+            @if(auth()->user()->hasOversightAccess())
                 <div class="flex flex-wrap items-center gap-2">
                     @if($logReset ?? null)
                         <a href="{{ ($showHistory ?? false) ? route('dean.audit-trail') : route('dean.audit-trail', ['history' => 1]) }}" class="btn btn-secondary">{{ ($showHistory ?? false) ? 'Current log' : 'View earlier records' }}</a>
                     @endif
+                    @if(auth()->user()->isDean())
                     <form id="reset-activity-form" method="POST" action="{{ route('dean.audit-trail.reset') }}">@csrf
                         <button type="button" class="btn btn-danger" @disabled(!($activityResetReady ?? false)) onclick="confirmResetActivity()">Reset Activity Log</button>
                     </form>
+                    @endif
                 </div>
             @endif
         </div>
-        @unless($activityResetReady ?? false)
+        @if(!($activityResetReady ?? false) && auth()->user()->isDean())
             <p class="px-4 py-2 text-sm text-amber-700">The Activity Log reset migration is pending.</p>
-        @endunless
+        @endif
         @if(($logReset ?? null) && !($showHistory ?? false))
             <p class="px-4 py-2 text-sm text-gray-500">Showing activity since {{ $logReset->reset_at->format('M j, Y g:i A') }}. Earlier records remain available in historical view.</p>
         @endif
@@ -72,6 +74,16 @@
                                 {{ $u->employee->full_name ?? $u->username }}
                                 @if($u->role) ({{ $u->role->role_name }}) @endif
                             </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="form-group mb-0">
+                    <label class="form-label" for="audit-actor-role">Actions by</label>
+                    <select id="audit-actor-role" name="actor_role" class="form-control">
+                        <option value="">All roles</option>
+                        @foreach($actorRoles ?? [] as $roleName)
+                            <option value="{{ $roleName }}" @selected(($filters['actor_role'] ?? '') === $roleName)>{{ $roleName }}</option>
                         @endforeach
                     </select>
                 </div>

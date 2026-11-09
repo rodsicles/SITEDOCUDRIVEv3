@@ -32,7 +32,7 @@
         @php
             $extension = strtolower(pathinfo($document->file_path, PATHINFO_EXTENSION));
             $canRename = $documentService->userCanRenameDocument($document, $user);
-            $canDelete = $user->isDean() || $user->isSecretary() || (int) $document->uploaded_by === (int) $user->id;
+            $canDelete = $user->isDeanOrSecretary() || (int) $document->uploaded_by === (int) $user->id;
             $canCopy   = $document->canView($user);
             $isFavorited = $canFavorite && $document->isFavoritedBy($user->id);
             $sizeBytes = (int) ($document->file_size ?? 0);

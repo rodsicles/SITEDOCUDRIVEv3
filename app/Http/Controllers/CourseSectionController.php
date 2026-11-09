@@ -13,8 +13,8 @@ class CourseSectionController extends Controller
 {
     private function programs(Request $request): array
     {
-        abort_unless($request->user()->isDean() || $request->user()->isProgramCoordinator(), 403);
-        return $request->user()->isDean() ? Program::codes() : CoordinatorDepartment::requirePrograms($request->user());
+        abort_unless($request->user()->hasOversightAccess() || $request->user()->isProgramCoordinator(), 403);
+        return $request->user()->hasOversightAccess() ? Program::codes() : CoordinatorDepartment::requirePrograms($request->user());
     }
 
     public function index(Request $request)
@@ -26,7 +26,7 @@ class CourseSectionController extends Controller
             ->when(($filters['status'] ?? 'active') !== 'all', fn ($q) => $q->where('is_active', ($filters['status'] ?? 'active') === 'active'))
             ->when(filled($filters['search'] ?? null), fn ($q) => $q->where('name', 'like', '%'.$filters['search'].'%'))
             ->orderBy('program')->orderBy('year_level')->orderBy('name')->paginate(30)->withQueryString();
-        $routePrefix = $request->user()->isDean() ? 'dean' : 'coordinator';
+        $routePrefix = $request->user()->hasOversightAccess() ? 'dean' : 'coordinator';
         return view('sections.index', compact('sections', 'programs', 'filters', 'routePrefix'));
     }
 
@@ -87,7 +87,7 @@ class CourseSectionController extends Controller
 
     private function redirect(Request $request)
     {
-        return redirect()->route(($request->user()->isDean() ? 'dean' : 'coordinator').'.courses', ['view' => 'sections']);
+        return redirect()->route(($request->user()->hasOversightAccess() ? 'dean' : 'coordinator').'.courses', ['view' => 'sections']);
     }
 
     private function log(Request $request, CourseSection $section, string $action): void

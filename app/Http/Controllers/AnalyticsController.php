@@ -40,7 +40,7 @@ class AnalyticsController extends Controller
             'analyticsRoute' => $this->routeNameFor($user),
         ]);
 
-        if ($user->isDean() || $user->isSecretary()) {
+        if ($user->isDeanOrSecretary()) {
             $data = array_merge($data, $this->dashboardService->getAnalyticsData());
             if ($user->isDean()) {
                 $data['monthlyHistoryReady'] = Schema::hasTable('monthly_analytics_snapshots');
@@ -84,7 +84,7 @@ class AnalyticsController extends Controller
 
     protected function routeNameFor($user): string
     {
-        if ($user->isDean() || $user->isSecretary()) {
+        if ($user->isDeanOrSecretary()) {
             return 'dean.analytics';
         }
         if ($user->isProgramCoordinator()) {

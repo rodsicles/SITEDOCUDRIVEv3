@@ -17,7 +17,7 @@
 
 @section('content')
 @php
-    $canPostAnnouncement = auth()->user()->isDean() || auth()->user()->isProgramCoordinator();
+    $canPostAnnouncement = auth()->user()->hasOversightAccess() || auth()->user()->isProgramCoordinator();
     $announcementTotal = $announcements->total();
 @endphp
 
@@ -99,7 +99,7 @@
                     </div>
 
                     {{-- Action menu --}}
-                    @if($announcement->author_id === auth()->id() || auth()->user()->isDean())
+                    @if($announcement->author_id === auth()->id() || auth()->user()->hasOversightAccess())
                     <div class="relative flex-shrink-0" id="menu-wrapper-{{ $announcement->announcement_id }}">
                         <button type="button"
                                 onclick="toggleMenu({{ $announcement->announcement_id }})"
@@ -185,7 +185,7 @@
                         <span class="text-xs text-gray-400 dark:text-gray-500">
                             <i class="fas fa-eye mr-0.5"></i> {{ $announcement->reads->count() }}
                         </span>
-                        @if(auth()->id() === $announcement->author_id || auth()->user()->isDean())
+                        @if(auth()->id() === $announcement->author_id || auth()->user()->hasOversightAccess())
                             <button type="button"
                                     onclick="openReceipts({{ $announcement->announcement_id }})"
                                     class="text-xs text-[#028a0f] dark:text-[#02b815] hover:underline bg-transparent border-none cursor-pointer font-medium">

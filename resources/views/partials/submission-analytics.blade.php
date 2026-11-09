@@ -49,7 +49,7 @@
                     <option value="2nd" @selected(($filters['semester'] ?? '') === '2nd')>2nd Semester</option>
                 </select>
             </div>
-            @if(auth()->user()->isDean() || auth()->user()->isSecretary())
+            @if(auth()->user()->isDeanOrSecretary())
             <div class="submission-analytics-filters__field">
                 <label class="submission-analytics-filters__label" for="submission-program">
                     <i class="fas fa-building"></i> Program

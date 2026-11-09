@@ -24,6 +24,8 @@ use Illuminate\Support\Facades\Schema;
 
 class DeanController extends Controller
 {
+    private const AUDIT_ACTOR_ROLES = ['Dean', 'Admin', 'Secretary', 'Program Coordinator', 'Faculty Employee'];
+
     use \App\Http\Controllers\Concerns\HandlesUploadExceptions;
     use \App\Http\Controllers\Concerns\PreventsDuplicateUpload;
     use \App\Http\Controllers\Concerns\ManagesUserNotifications;
@@ -74,6 +76,7 @@ class DeanController extends Controller
             'q'             => 'nullable|string|max:100',
             'activity_type' => 'nullable|string|max:100',
             'user_id'       => 'nullable|integer|exists:users,id',
+            'actor_role'    => ['nullable', \Illuminate\Validation\Rule::in(self::AUDIT_ACTOR_ROLES)],
             'date_from'     => 'nullable|date',
             'date_to'       => 'nullable|date|after_or_equal:date_from',
         ]);
@@ -81,7 +84,7 @@ class DeanController extends Controller
         $query = $this->buildAuditTrailQuery($filters);
         $activityResetReady = Schema::hasTable('system_reset_events');
         $logReset = app(SystemResetService::class)->latest('activity_log');
-        $showHistory = $request->boolean('history') && $request->user()->isDean();
+        $showHistory = $request->boolean('history') && $request->user()->hasOversightAccess();
         if ($logReset && !$showHistory) $query->where('log_id', '>', $logReset->closed_metrics['cutoff_log_id'] ?? 0);
         $logs  = $query->paginate(25)->withQueryString();
 
@@ -98,8 +101,10 @@ class DeanController extends Controller
             ->sortBy(fn($u) => $u->employee->full_name ?? $u->username)
             ->values();
 
+        $actorRoles = self::AUDIT_ACTOR_ROLES;
+
         return view('dean.audit-trail', compact(
-            'logs', 'activityTypes', 'users', 'filters', 'logReset', 'showHistory', 'activityResetReady',
+            'logs', 'activityTypes', 'users', 'filters', 'logReset', 'showHistory', 'activityResetReady', 'actorRoles',
         ));
     }
 
@@ -127,6 +132,10 @@ class DeanController extends Controller
                 $q->where('user_id', $filters['user_id'])
                   ->orWhere('target_user_id', $filters['user_id']);
             });
+        }
+
+        if (!empty($filters['actor_role'])) {
+            $query->whereHas('user.role', fn ($r) => $r->where('role_name', $filters['actor_role']));
         }
 
         if (!empty($filters['date_from'])) {
@@ -465,13 +474,27 @@ class DeanController extends Controller
         return response()->json(CourseAssignment::coursesFor($request->query('dept')));
     }
 
+    /**
+     * Dean accounts are never managed here. Admin accounts can only be managed by the Dean
+     * (and their details are not edited through the program-based form). Admins manage Faculty only.
+     */
+    private function authorizeAccountTarget(Employee $employee, bool $editingDetails = false): void
+    {
+        $target = $employee->user;
+        $actor = auth()->user();
+
+        abort_if($target->isDean(), 403, 'Dean accounts cannot be managed here.');
+        abort_if($target->isAdmin() && (!$actor->isDean() || $editingDetails), 403, $editingDetails
+            ? 'Admin account details are updated from the Admin\'s own profile.'
+            : 'Only the Dean can manage Admin accounts.');
+        abort_if($actor->isAdmin() && !$target->isFaculty(), 403, 'Admins can only manage Faculty accounts.');
+    }
+
     public function editEmployee($id)
     {
         $employee = Employee::with(['user.role', 'user.assignedCourses'])->where('employee_id', $id)->firstOrFail();
 
-        if ($employee->user->role_id === 1) {
-            abort(403, 'Cannot edit Dean accounts.');
-        }
+        $this->authorizeAccountTarget($employee, true);
 
         $allCourses       = CourseAssignment::coursesFor($employee->program);
         $assignedCourseIds = $employee->user->assignedCourses->pluck('id')->all();
@@ -483,9 +506,7 @@ class DeanController extends Controller
     {
         $employee = Employee::with('user')->where('employee_id', $id)->firstOrFail();
 
-        if ($employee->user->role_id === 1) {
-            abort(403, 'Cannot edit Dean accounts.');
-        }
+        $this->authorizeAccountTarget($employee, true);
 
         $nameRules = EmployeeNameInput::prepareForUpdate($request, $employee);
         $validated = $request->validate([
@@ -509,6 +530,7 @@ class DeanController extends Controller
     public function deactivateEmployee($id)
     {
         $employee = Employee::with('user')->where('employee_id', $id)->firstOrFail();
+        $this->authorizeAccountTarget($employee);
 
         try {
             $this->employeeService->setAccountStatus($employee, 'Inactive', auth()->user());
@@ -528,6 +550,7 @@ class DeanController extends Controller
     public function reactivateEmployee($id)
     {
         $employee = Employee::with('user')->where('employee_id', $id)->firstOrFail();
+        $this->authorizeAccountTarget($employee);
 
         try {
             $this->employeeService->setAccountStatus($employee, 'Active', auth()->user());
@@ -598,9 +621,7 @@ class DeanController extends Controller
     {
         $employee = Employee::with('user')->where('employee_id', $id)->firstOrFail();
 
-        if ($employee->user->role_id === 1) {
-            abort(403, 'Cannot reset Dean password.');
-        }
+        $this->authorizeAccountTarget($employee);
 
         if ($employee->user->status !== 'Active') {
             return back()->withErrors(['error' => 'Reactivate this account before resetting the password.']);
@@ -616,6 +637,52 @@ class DeanController extends Controller
         } catch (\Exception $e) {
             \Log::error('Password reset error: ' . $e->getMessage());
             return back()->withErrors(['error' => 'Failed to reset password.']);
+        }
+    }
+
+    /**
+     * Issue a one-time temporary password (shown once) without a request from the user.
+     * Admin: Faculty only. Dean/Secretary: any non-Dean account they may manage.
+     */
+    public function issueTemporaryPassword($id, \App\Services\PasswordResetRequestService $resets)
+    {
+        $employee = Employee::with('user')->where('employee_id', $id)->firstOrFail();
+
+        $this->authorizeAccountTarget($employee);
+        abort_if((int) $employee->user_id === (int) auth()->id(), 403, 'Use Profile to change your own password.');
+
+        if ($employee->user->status !== 'Active') {
+            return back()->withErrors(['error' => 'Reactivate this account before resetting the password.']);
+        }
+
+        $tempPassword = $resets->generateTempPassword();
+        $this->employeeService->resetEmployeePassword($employee, $tempPassword, auth()->user());
+
+        return redirect()->route('dean.employee-profile', $id)
+            ->with('success', 'Temporary password created. Give it to the employee in person; they must change it at next login.')
+            ->with('temp_password', $tempPassword)
+            ->with('temp_password_user', $employee->full_name);
+    }
+
+    public function storeAdmin(Request $request)
+    {
+        abort_unless($request->user()->isDean(), 403);
+        $nameRules = EmployeeNameInput::prepare($request);
+        $validated = $request->validate([
+            'username' => 'required|string|unique:users,username|max:20',
+            'password' => 'required|string|min:8|max:40',
+        ] + $nameRules);
+
+        if (!\App\Models\Role::where('role_name', \App\Models\Role::ADMIN)->exists()) {
+            return back()->withErrors(['error' => 'The Admin role is not installed yet. Run the 2026_11_09_000001_add_admin_role migration, then try again.'])->withInput();
+        }
+
+        try {
+            $this->employeeService->createAdmin($validated, auth()->id());
+            return redirect()->route('dean.employees')->with('success', 'Admin account created. The Admin must change the password at first login.');
+        } catch (\Exception $e) {
+            \Log::error('Admin creation error: ' . $e->getMessage());
+            return back()->withErrors(['error' => 'Failed to create admin account. Please try again.'])->withInput();
         }
     }
 

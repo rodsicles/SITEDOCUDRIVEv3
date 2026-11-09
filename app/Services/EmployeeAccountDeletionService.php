@@ -35,11 +35,11 @@ class EmployeeAccountDeletionService
 
         $user = $employee->user()->with('role')->firstOrFail();
 
-        if ($user->role_id === 1) {
+        if ($user->isDean()) {
             abort(403, 'Cannot delete Dean accounts.');
         }
 
-        if (!in_array((int) $user->role_id, [2, 3], true)) {
+        if (!$user->isProgramCoordinator() && !$user->isFaculty()) {
             abort(403, 'Only faculty and coordinator accounts can be permanently deleted.');
         }
 
@@ -47,7 +47,8 @@ class EmployeeAccountDeletionService
             abort(403, 'You cannot delete your own account.');
         }
 
-        if (!$actor->isDeanOrSecretary()) {
+        // Permanent account deletion stays with the Dean office (Dean/Secretary), not Admin.
+        if (!$actor->isDean() && !$actor->isSecretary()) {
             abort(403, 'Unauthorized.');
         }
 

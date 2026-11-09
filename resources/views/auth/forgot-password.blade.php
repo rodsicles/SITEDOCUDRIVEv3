@@ -31,15 +31,15 @@
         <div class="login-portal-card">
             <div class="login-portal-card-header">
                 <h2 class="login-portal-card-title">Forgot Password</h2>
-                <p class="login-portal-card-subtitle">Request a password reset from the Dean</p>
+                <p class="login-portal-card-subtitle">Request a password reset from the Dean or Admin</p>
             </div>
 
             <div class="login-portal-card-body">
                 <div class="login-portal-welcome">
                     <h3 class="login-portal-welcome-title">Reset Request</h3>
                     <p class="login-portal-welcome-sub">
-                        Enter your username below. Your request will be sent to the Dean for review.
-                        Once approved, the Dean will hand you a temporary password in person.
+                        Enter your username below. Your request will be sent to the Dean or Admin for review.
+                        Once approved, they will hand you a temporary password in person.
                     </p>
                 </div>
 
@@ -94,7 +94,7 @@
                 <div class="forgot-password-note">
                     <i class="fas fa-shield-alt"></i>
                     For security, your existing password will be replaced with a one-time temporary
-                    password the Dean issues to you. You will be required to change it on first login.
+                    password the Dean or Admin issues to you. You will be required to change it on first login.
                 </div>
             </div>
         </div>

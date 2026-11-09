@@ -18,7 +18,7 @@ trait ScopesSubmissionVisibility
 
     public function scopeVisibleTo(Builder $query, User $viewer): Builder
     {
-        if ($viewer->isDean() || $viewer->isSecretary()) {
+        if ($viewer->isDeanOrSecretary()) {
             return $query;
         }
 
@@ -56,7 +56,7 @@ trait ScopesSubmissionVisibility
 
     public function isVisibleTo(User $viewer): bool
     {
-        if ($viewer->isDean() || $viewer->isSecretary()) {
+        if ($viewer->isDeanOrSecretary()) {
             return true;
         }
 

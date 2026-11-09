@@ -81,7 +81,7 @@ class ProfessionalDevelopmentController extends Controller
 
         $user = auth()->user();
         // Owner, Dean, or Coordinator may view
-        if ((int) $pd->user_id !== (int) $user->id && !$user->isDean() && !$user->isSecretary() && !$user->isProgramCoordinator()) {
+        if ((int) $pd->user_id !== (int) $user->id && !$user->isDeanOrSecretary() && !$user->isProgramCoordinator()) {
             abort(403);
         }
 

@@ -19,7 +19,8 @@ class PasswordResetRequestController extends Controller
 
         $tab = $request->query('tab', 'pending');
 
-        $query = PasswordResetRequest::with(['user.employee', 'user.role', 'handler.employee'])
+        $query = $this->service->handleableQuery($request->user())
+            ->with(['user.employee', 'user.role', 'handler.employee'])
             ->latest('created_at');
 
         if ($tab === 'handled') {
@@ -34,7 +35,7 @@ class PasswordResetRequestController extends Controller
 
         $requests = $query->paginate(15)->withQueryString();
 
-        $pendingCount = PasswordResetRequest::pending()->count();
+        $pendingCount = $this->service->handleableQuery($request->user())->pending()->count();
 
         return view('dean.password-reset-requests', [
             'requests'     => $requests,
@@ -47,10 +48,15 @@ class PasswordResetRequestController extends Controller
 
     public function approve(Request $request, int $id)
     {
-        $resetRequest = PasswordResetRequest::with('user.employee')->findOrFail($id);
+        $validated = $request->validate([
+            'reason' => 'nullable|string|max:255',
+        ]);
+
+        $resetRequest = PasswordResetRequest::with('user.employee', 'user.role')->findOrFail($id);
+        abort_unless($this->service->canHandle($resetRequest, auth()->user()), 403, 'You cannot handle this password reset request.');
 
         try {
-            $tempPassword = $this->service->approve($resetRequest, auth()->user());
+            $tempPassword = $this->service->approve($resetRequest, auth()->user(), $validated['reason'] ?? null);
         } catch (\RuntimeException $e) {
             return redirect()->route('password-reset-requests.index')
                 ->withErrors(['error' => $e->getMessage()]);
@@ -72,7 +78,8 @@ class PasswordResetRequestController extends Controller
             'reason' => 'nullable|string|max:255',
         ]);
 
-        $resetRequest = PasswordResetRequest::findOrFail($id);
+        $resetRequest = PasswordResetRequest::with('user.role')->findOrFail($id);
+        abort_unless($this->service->canHandle($resetRequest, auth()->user()), 403, 'You cannot handle this password reset request.');
 
         try {
             $this->service->deny($resetRequest, auth()->user(), $validated['reason'] ?? null);

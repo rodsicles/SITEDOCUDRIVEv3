@@ -379,7 +379,7 @@ class TeachingGuideController extends Controller
 
     private function getViewRole($user): string
     {
-        if ($user->isDean() || $user->isSecretary()) {
+        if ($user->isDeanOrSecretary()) {
             return 'dean';
         }
         if ($user->isProgramCoordinator()) {

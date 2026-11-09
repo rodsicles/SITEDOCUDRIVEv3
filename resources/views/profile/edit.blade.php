@@ -6,7 +6,7 @@
 @section('page-subtitle', 'Update your personal information and password')
 
 @section('sidebar')
-    @if(auth()->user()->isDean())
+    @if(auth()->user()->hasOversightAccess())
         @include('partials.dean-sidebar')
     @elseif(auth()->user()->isProgramCoordinator())
         @include('partials.coordinator-sidebar')

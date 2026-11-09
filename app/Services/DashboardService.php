@@ -32,7 +32,7 @@ class DashboardService
             ? "{$currentUploads} uploads in each seven-day period."
             : abs($difference).' '.(abs($difference) === 1 ? 'file' : 'files').' '.($difference > 0 ? 'more' : 'fewer').' than the previous seven days.';
 
-        if ($user->isDean() || $user->isSecretary()) {
+        if ($user->isDeanOrSecretary()) {
             $overdue = Task::whereNotNull('due_date')->whereDate('due_date', '<', today())->where('status', '!=', 'Completed')->count();
             $pending = \App\Models\TeachingGuide::where('status', 'pending')->count()
                 + \App\Models\ExamQuestionnaire::where('status', 'pending')->count();
@@ -58,7 +58,7 @@ class DashboardService
             $positive = ['tone'=>'positive','title'=>"{$completed} tasks completed in 30 days",'detail'=>'A concise view of your recently finished work.','url'=>route('faculty.tasks', ['filter'=>'completed']),'action'=>'View completed'];
         }
 
-        $trend = ['tone'=>'trend','title'=>"Document activity {$trendWord}",'detail'=>$trendDetail,'url'=>match (true) { $user->isDean() || $user->isSecretary() => route('dean.documents', ['scope'=>'all']), $user->isProgramCoordinator() => route('coordinator.documents', ['scope'=>'all']), default => route('faculty.documents', ['scope'=>'all']) },'action'=>'Open documents'];
+        $trend = ['tone'=>'trend','title'=>"Document activity {$trendWord}",'detail'=>$trendDetail,'url'=>match (true) { $user->isDeanOrSecretary() => route('dean.documents', ['scope'=>'all']), $user->isProgramCoordinator() => route('coordinator.documents', ['scope'=>'all']), default => route('faculty.documents', ['scope'=>'all']) },'action'=>'Open documents'];
 
         return [$urgent, $trend, $positive];
     }

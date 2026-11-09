@@ -50,7 +50,7 @@
         <input type="hidden" name="scope" value="{{ $scope }}">
         @if($search !== '')<input type="hidden" name="search" value="{{ $search }}">@endif
         <label>Uploaded by<select name="uploaded_by"><option value="">Anyone I can access</option>@foreach($uploaders as $uploader)<option value="{{ $uploader->id }}" @selected((string)request('uploaded_by') === (string)$uploader->id)>{{ $uploader->employee->full_name ?? $uploader->username }}</option>@endforeach</select></label>
-        @if(auth()->user()->isDean() || auth()->user()->isSecretary())
+        @if(auth()->user()->isDeanOrSecretary())
         <label>Program<select name="program"><option value="">All programs</option>@foreach($searchDepartments as $department)<option value="{{ $department }}" @selected(request('program') === $department)>{{ $department }}</option>@endforeach</select></label>
         @endif
         <label>Course<select name="course_id"><option value="">All accessible courses</option>@foreach($searchCourses as $course)<option value="{{ $course->id }}" @selected((string)request('course_id') === (string)$course->id)>{{ $course->code }} — {{ $course->title }}</option>@endforeach</select></label>

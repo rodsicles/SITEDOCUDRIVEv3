@@ -8,6 +8,7 @@ SITE DocuDrive is the employee document and academic-workflow portal for the Sch
 
 - One SITE department contains **BLIS, BSEnSE, BSIT, BSCpE**. BSEnSE currently means Environmental and Sanitary Engineering.
 - Coordinator management scope is **home program + Dean-assigned “Also handles” programs**. Reuse `CoordinatorDepartment::programs()` / `User::handledPrograms()`. Management scope is separate from subjects the Coordinator personally teaches.
+- **Admin** (added 2026-11-09, migration `2026_11_09_000001_add_admin_role`) covers day-to-day Dean oversight across all programs; Dean-only actions stay behind `isDean()` / `role:Dean,Secretary`. Forgot Password has no email: Dean requests go to an Admin, Admin requests go to the Dean.
 - Faculty document access includes own files, explicit shares, and qualifying broadcasts. Dean visibility is broad but must honor personal-category and private-folder rules. Never infer authorization from a sidebar.
 - Current UI: dark-green sidebar, white surfaces, pale green-gray workspace, square controls, restrained borders, Segoe UI. Read the design section before adding styles.
 - Shared document search is implemented in `DocumentSearchService`; compact errors use `SiteRequest` and `ui-error-dialog`. Some requested edge cases remain incomplete: see Known gaps.
@@ -21,7 +22,8 @@ SITE DocuDrive is the employee document and academic-workflow portal for the Sch
 
 | Task | Read section | Start in code |
 |---|---|---|
-| Access / programs / accounts | Permissions and accounts | `app/Support/CoordinatorDepartment.php`, `app/Services/EmployeeService.php`, `routes/web.php` |
+| Access / programs / accounts / Admin role | Permissions and accounts | `app/Models/User.php` (role helpers), `app/Support/CoordinatorDepartment.php`, `app/Services/EmployeeService.php`, `routes/web.php` |
+| Forgot Password / temporary passwords | Daily operations | `app/Services/PasswordResetRequestService.php`, `app/Http/Controllers/PasswordResetRequestController.php`, `DeanController::issueTemporaryPassword` |
 | Files / folders / uploads | Documents and submissions | `app/Services/DocumentService.php`, `app/Services/FolderService.php` |
 | Search / OCR | Search and indexing | `app/Services/DocumentSearchService.php`, `app/Services/GlobalSearchService.php` |
 | Requests / compliance / corrections | Document requests | `app/Http/Controllers/DocumentRequestController.php`, `app/Services/DocumentRequestManagementService.php` |
@@ -42,11 +44,16 @@ SITE DocuDrive is the employee document and academic-workflow portal for the Sch
 | Role | Current model and boundaries |
 |---|---|
 | Dean | Broad employee, document, review, and administrative access; creates Coordinators and Faculty and assigns extra handled programs. Privacy still applies. |
-| Secretary | Shares many `/dean` routes through `role:Dean,Secretary`, but individual controller checks can be stricter. Do not assume universal Dean equivalence. Teacher's Load manager checks explicitly name Dean and Coordinator. |
+| Admin | Day-to-day oversight when the Dean is busy, across **all four programs** (no home program). Shares the `/dean` pages and Dean sidebar, Teacher's Load, Course Catalog/Sections, document requests, announcements, Recycle Bin (view/restore), **Rejected Files**, Activity Log/Audit Trail (including earlier-records history), analytics (view), and the Password Resets queue. Creates and manages **Faculty only** (create, edit, deactivate/reactivate, one-time temporary password). Cannot: create Coordinators or Admins, manage Dean/Admin/Coordinator/Secretary accounts, back up/restore, permanently delete documents or accounts, archive/restore/delete school years, close or reset analytics, or reset the Activity Log. Private folders still apply. |
+| Secretary | Shares many `/dean` routes, but individual controller checks can be stricter. Do not assume universal Dean equivalence. Teacher's Load manager checks name Dean, Admin, and Coordinator. |
 | Program Coordinator | Manages permitted Faculty/program resources using home plus extra programs. Can create Faculty; cannot infer permission to create Coordinators or use system administration merely from expanded program scope. |
 | Faculty Employee | Personal work, assigned tasks and subjects, received requests and shared documents; own published/void teaching loads and saved revision history. No access to unpublished load revisions. |
 
 Sources: `routes/web.php`, `app/Models/User.php`, `app/Models/Document.php`, `app/Models/Folder.php`, and `app/Models/Concerns/ScopesSubmissionVisibility.php`. Specific endpoint checks are authoritative for exceptions.
+
+**Role helpers (use these, not role IDs):** `isDean()` = Dean-only actions; `hasOversightAccess()` = Dean or Admin (Teacher's Load, sections, requests, announcements, system categories, full activity log); `isDeanOrSecretary()` = Dean office (Dean, Secretary, **and Admin**) for all-program visibility, review queues and `/dean` routing. The `/dean` route group allows `Dean,Secretary,Admin`; Admin-excluded routes carry an extra `role:Dean,Secretary` (backup, store-coordinator, permanent deletes, archive/restore/delete year) or `role:Dean` (store-admin) middleware, plus `isDean()` controller checks for analytics/activity resets. Account targets are checked by `DeanController::authorizeAccountTarget()` and `EmployeeService::setAccountStatus()`. Role IDs 1–4 are seed order; Admin is inserted by name (`Role::idFor(Role::ADMIN)`), so do not compare `role_id` numbers.
+
+Admin accounts are created only by the Dean (Employees → **Create Admin**): first/middle/last name, username, temporary password; no program; employee number `SITE-GEN-ADMIN###`; forced password change at first login. Admin details are edited from the Admin's own profile; the Dean can deactivate/reactivate or reset an Admin account.
 
 Accounts use an employee record linked to a user/role. Create Coordinator and Edit Employee expose home Program plus “Also handles”; extra assignments are stored through `EmployeeProgram` / `employee_programs`. An invalid or missing home program yields no Coordinator handled-program list. The UI hides the home program from the additional list. Own profile and employee profile show the extra programs.
 
@@ -164,6 +171,10 @@ Dean Documents now offers separate Recycle Bin and permanent-delete actions. The
 | Reports / professional development | Report files and employee professional records use their dedicated controllers/services. Do not treat dashboard reports, uploaded reports, and performance evaluations as the same record type. |
 | User guide | `resources/views/user-guide.blade.php` is employee-facing help. Update relevant instructions when workflows change; it is separate from this developer reference. |
 | Login / profile | Username/password login, reset requests, forced initial password change, photo upload, personal details and security. Profile uses tabs and shows fixed account information plus handled programs. |
+| Forgot Password (no email) | Login → Forgot Password → username creates a `password_reset_requests` row; no SMTP/email is used. `PasswordResetRequestService::HANDLER_ROLES` routes it: **Dean → Admin only**, **Admin → Dean only**, Faculty/Coordinator/Secretary → Dean, Secretary, or Admin. Nobody handles their own request; the queue (`handleableQuery`) and approve/deny endpoints (`canHandle`) enforce this, and only eligible handlers are notified. If no active Admin exists, a Dean request is refused with "contact your system administrator". Approval generates a 12-character temporary password shown once, sets `must_change_password`, notifies and logs. Resetting the **Dean** requires a reason (≥5 characters, stored in `reason`). |
+| Temporary password (direct) | Profile → **Generate temporary password** (`dean.temporary-password`) replaces the password with a one-time temporary password shown once, without a user request. Admin: Faculty only. Dean/Secretary: accounts they may manage (never the Dean; Admin accounts only by the Dean). The typed reset on Edit Employee remains. |
+| Rejected Files | `dean.rejected-files.index` (`RejectedFilesController`), Dean and Admin only. Read-only list of rejected Teaching Guides and Exam Questionnaires across programs with faculty, reviewer, remarks, and date; filters by type, program, school year, and text. Owners still fix/resubmit or delete their own rejected files. No migration. |
+| Activity Log (oversight) | Dean and Admin see all `DashboardLog` entries and the earlier-records history; the Audit Trail adds an **Actions by** role filter (e.g. Admin). Only the Dean can reset the Activity Log view. |
 
 ## Archives and audit trail
 
@@ -259,6 +270,7 @@ Pulled from archived guides so those files are no longer required reading. Re-ve
 - Ordinary document replacement still has a separate path from request corrections. Consolidating approval, file-mirror, authorization, and indexing behavior remains outstanding; workflow corrections in `86cd234` did not fix that path.
 - Only audit feature items **1 (load corrections), 3 (request management), and 5 (catalog editing)** were approved and implemented. Term-specific assignments, task editing/reassignment/cancellation, sharing-management controls, report corrections, and expanded folder/training recovery remain recommendations, not shipped functions.
 - Production migrations, OCR binaries, scheduler/worker health, fresh browser checks and remote deployment state were not verified in this pass.
+- Admin role: announcements targeted to a single program are not shown in the Admin's feed because Admin has no home program (`Announcement::scopeVisibleTo` unchanged). The Secretary sidebar still links some Dean pages it cannot use (pre-existing). Calendar remains unrouted.
 
 ## Documentation map
 
@@ -281,6 +293,8 @@ Pulled from archived guides so those files are no longer required reading. Re-ve
 Remaining archive (still in tree): old lime `AGENTDESIGN.md`; `MD FOLDERS/UI_COLOR_LATEST_UPDATE.md`, `DOCUMENT_REQUEST_SEARCH.md`, `FEATURES_IMPLEMENTATION_GUIDE.md`, `PERFORMANCE_OPTIMIZATION.md`; `EMP-Dashboard-KnowledgeBase/KNOWLEDGE_BASE.md`. Git history remains the recovery path. Do not copy credentials from old guides.
 
 ## Change history
+
+- **2026-11-09 | uncommitted:** Added the **Admin** role for day-to-day oversight across all programs (Faculty account management, Course Catalog/Sections, Teacher's Load, requests, Recycle Bin view/restore, new Rejected Files page, Activity Log with an "Actions by" role filter, password-reset queue). Dean-only: backups, permanent deletes, school-year archive actions, analytics/activity resets, Coordinator and Admin accounts. Forgot Password now routes Dean → Admin and Admin → Dean (no email), blocks self-handling, and requires a reason to reset the Dean; Admin/Dean can generate a one-time temporary password from a profile. Replaced numeric `role_id` checks with role-name helpers. Migration `2026_11_09_000001_add_admin_role` (inserts the role only; no account seeded) — run on local WAMP only (path-specific); not run on Cloud. Create Admin now shows a clear message if the role row is missing. Local SQLite suite: 141 passed, 1 existing MySQL-only skip; targeted Rector dry-run and `npm run build` passed. Browser verification pending.
 
 - **2026-11-07 | release pending:** Extended first/optional middle/last name fields from account creation to Dean/Coordinator employee edits and editable profiles. Added nullable employee name-part columns, preserved full-name-only accounts without guessing, and synchronized display names in users and employees. Name-part migration completed on local WAMP only; focused local tests: 24 passed, 213 assertions; Blade compilation and diff check passed. Cloud migration/browser verification pending.
 

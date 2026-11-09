@@ -18,7 +18,7 @@ class TaskAssigneeResolver
     {
         return User::query()
             ->with(['employee', 'role'])
-            ->whereIn('role_id', [2, 3])
+            ->whereHas('role', fn ($q) => $q->whereIn('role_name', [\App\Models\Role::COORDINATOR, \App\Models\Role::FACULTY]))
             ->where('status', 'Active')
             ->whereHas('employee', fn ($q) => $q->whereIn('program', \App\Models\Program::codes()));
     }

@@ -74,7 +74,7 @@ class NotificationService
     {
         $query = User::query()
             ->where('status', 'Active')
-            ->whereHas('role', fn ($q) => $q->whereIn('role_name', ['Dean', 'Secretary']));
+            ->whereHas('role', fn ($q) => $q->whereIn('role_name', ['Dean', 'Secretary', 'Admin']));
 
         if ($exceptUserId) {
             $query->where('id', '!=', $exceptUserId);
@@ -92,7 +92,7 @@ class NotificationService
     {
         $query = User::query()
             ->where('status', 'Active')
-            ->whereHas('role', fn ($q) => $q->whereIn('role_name', ['Dean', 'Secretary', 'Program Coordinator']));
+            ->whereHas('role', fn ($q) => $q->whereIn('role_name', ['Dean', 'Secretary', 'Admin', 'Program Coordinator']));
 
         if ($exceptUserId) {
             $query->where('id', '!=', $exceptUserId);
@@ -263,6 +263,9 @@ class NotificationService
     {
         if ($reviewer->isSecretary()) {
             return 'Secretary';
+        }
+        if ($reviewer->isAdmin()) {
+            return 'Admin';
         }
         if ($reviewer->isProgramCoordinator()) {
             return 'Program Coordinator';

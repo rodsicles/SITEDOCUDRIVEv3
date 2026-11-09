@@ -6,7 +6,7 @@
 @section('page-subtitle', 'Detailed employee information and history')
 
 @section('sidebar')
-    @if(auth()->user()->isDean())
+    @if(auth()->user()->isDeanOrSecretary())
         @include('partials.dean-sidebar')
     @else
         @include('partials.coordinator-sidebar')
@@ -17,12 +17,32 @@
 @php
     $assignedCourses = optional($employee->user)->assignedCourses ?? collect();
     $isInactive = $employee->user->status === 'Inactive';
-    $viewerIsDeanOffice = auth()->user()->isDeanOrSecretary();
+    $viewer = auth()->user();
+    $target = $employee->user;
+    $viewerIsDeanOffice = $viewer->isDeanOrSecretary();
+    // Mirrors DeanController::authorizeAccountTarget(): never the Dean, Admin accounts only by the Dean, Admin manages Faculty only.
+    $canManageAccount = $viewerIsDeanOffice && !$target->isDean()
+        && (!$target->isAdmin() || $viewer->isDean())
+        && (!$viewer->isAdmin() || $target->isFaculty());
+    $canEditIdentity = $canManageAccount && !$target->isAdmin();
+    $canPermanentDelete = ($viewer->isDean() || $viewer->isSecretary()) && config('employee.allow_hard_delete')
+        && ($target->isFaculty() || $target->isProgramCoordinator());
+    $isSelf = (int) $employee->user_id === (int) $viewer->id;
 @endphp
 
 <div class="employee-record">
+    @if(session('temp_password'))
+    <div class="ui-notice ui-notice--warning" role="status">
+        <div>
+            <strong><i class="fas fa-key"></i> Temporary password (shown once)</strong>
+            <p class="text-sm mt-1">Give this to <strong>{{ session('temp_password_user') }}</strong> in person. It will not be shown again, and they must change it at next login.</p>
+            <code class="temporary-password-value">{{ session('temp_password') }}</code>
+        </div>
+    </div>
+    @endif
+
     <div class="mb-0">
-        @if(auth()->user()->isDean())
+        @if($viewerIsDeanOffice)
             <a href="{{ route('dean.employees', $isInactive ? ['tab' => 'deactivated'] : []) }}" class="btn btn-secondary">
                 <i class="fas fa-arrow-left"></i> {{ $isInactive ? 'Back to Deactivated Accounts' : 'Back to Faculty Members' }}
             </a>
@@ -47,10 +67,12 @@
             <span class="badge {{ $employee->user->status === 'Active' ? 'badge-success' : 'badge-danger' }}">
                 {{ $employee->user->status }}
             </span>
-            @if($viewerIsDeanOffice && $employee->user->role_id !== 1)
+            @if($canManageAccount)
+                @if($canEditIdentity)
                 <a href="{{ route('dean.edit-employee', $employee->employee_id) }}" class="btn btn-primary text-sm">
                     <i class="fas fa-edit"></i> Edit
                 </a>
+                @endif
                 @if($employee->user->status === 'Inactive')
                 <form action="{{ route('dean.reactivate-employee', $employee->employee_id) }}" method="POST" class="m-0">
                     @csrf
@@ -59,7 +81,7 @@
                     </button>
                 </form>
                 @endif
-            @elseif(auth()->user()->role_id === 2)
+            @elseif($viewer->isProgramCoordinator())
                 <a href="{{ route('coordinator.edit-faculty', $employee->employee_id) }}" class="btn btn-primary text-sm">
                     <i class="fas fa-edit"></i> Edit
                 </a>
@@ -103,11 +125,11 @@
     <section class="employee-record__panel">
         <div class="employee-record__panel-head">
             <h3>Identity and account</h3>
-            @if($viewerIsDeanOffice && $employee->user->role_id !== 1)
+            @if($canEditIdentity)
                 <a href="{{ route('dean.edit-employee', $employee->employee_id) }}" class="btn btn-primary text-sm">
                     <i class="fas fa-edit"></i> Edit identity
                 </a>
-            @elseif(auth()->user()->role_id === 2)
+            @elseif($viewer->isProgramCoordinator())
                 <a href="{{ route('coordinator.edit-faculty', $employee->employee_id) }}" class="btn btn-primary text-sm">
                     <i class="fas fa-edit"></i> Edit identity
                 </a>
@@ -336,10 +358,20 @@
         @endif
     </section>
 
-    @if($viewerIsDeanOffice && $employee->user->role_id !== 1 && (int) $employee->user_id !== (int) auth()->id() && ($employee->user->status === 'Active' || (config('employee.allow_hard_delete') && in_array((int) $employee->user->role_id, [2, 3], true))))
+    @if($canManageAccount && !$isSelf && ($employee->user->status === 'Active' || $canPermanentDelete))
     <section class="employee-record__danger" aria-labelledby="account-actions-heading">
         <h3 id="account-actions-heading">Account actions</h3>
         @if($employee->user->status === 'Active')
+            <p class="text-sm text-gray-700 dark:text-gray-300 mb-3">
+                Forgot their password? Generate a one-time temporary password and give it to them in person. They must change it at next login.
+            </p>
+            <form action="{{ route('dean.temporary-password', $employee->employee_id) }}" method="POST" class="m-0 mb-4" id="temporaryPasswordForm">
+                @csrf
+                <button type="button" class="btn btn-secondary text-sm" onclick="confirmTemporaryPassword()">
+                    <i class="fas fa-key"></i> Generate temporary password
+                </button>
+            </form>
+
             <p class="text-sm text-gray-700 dark:text-gray-300 mb-3">
                 Deactivate to block sign-in while keeping documents and folders for records.
             </p>
@@ -351,7 +383,7 @@
             </form>
         @endif
 
-        @if(config('employee.allow_hard_delete') && in_array((int) $employee->user->role_id, [2, 3], true))
+        @if($canPermanentDelete)
             <p class="text-sm text-gray-700 dark:text-gray-300 mb-3">
                 <strong>Temporary feature.</strong> Permanent delete removes the account and all related data:
                 documents, teaching guides, exam questionnaires, tasks, notifications, custom folders,
@@ -397,6 +429,16 @@
 
 @push('scripts')
 <script>
+function confirmTemporaryPassword() {
+    var form = document.getElementById('temporaryPasswordForm');
+    if (!form) return;
+    var message = 'Replace this employee\'s current password with a one-time temporary password? It will be shown once, and they must change it at next login.';
+    if (typeof Swal === 'undefined') { if (confirm(message)) form.submit(); return; }
+    Swal.fire({ title: 'Generate temporary password?', text: message, icon: 'warning', showCancelButton: true,
+        confirmButtonText: 'Generate', cancelButtonText: 'Cancel', confirmButtonColor: '#0d5c3b',
+        customClass: { popup: 'swal-flat' } }).then(function (result) { if (result.isConfirmed) form.submit(); });
+}
+
 function confirmPermanentDeleteAccount() {
     var form = document.getElementById('permanentDeleteForm');
     if (!form) return;

@@ -30,7 +30,9 @@ class SchoolYearController extends Controller
             ->withCount(['documents', 'teachingGuides', 'examQuestionnaires', 'folders'])
             ->get();
 
-        $allowArchiveHardDelete = (bool) config('school_year.allow_archive_hard_delete', false);
+        // Archiving, restoring and deleting school years stay with the Dean office; Admin browses only.
+        $canManageArchives = !auth()->user()->isAdmin();
+        $allowArchiveHardDelete = $canManageArchives && (bool) config('school_year.allow_archive_hard_delete', false);
 
         // Counts for active year
         $activeDocCount = Document::where(function ($q) use ($activeSchoolYear) {
@@ -62,7 +64,7 @@ class SchoolYearController extends Controller
             'activeDocCount', 'activeTgCount', 'activeEqCount',
             'pendingTgCount', 'pendingEqCount', 'rejectedTgCount', 'rejectedEqCount',
             'suggestedStartYear',
-            'allowArchiveHardDelete',
+            'allowArchiveHardDelete', 'canManageArchives',
         ));
     }
 
@@ -309,7 +311,7 @@ class SchoolYearController extends Controller
     private function getViewRole(): string
     {
         $user = auth()->user();
-        if ($user->isDean() || $user->isSecretary()) return 'dean';
+        if ($user->isDeanOrSecretary()) return 'dean';
         if ($user->isProgramCoordinator()) return 'coordinator';
         return 'faculty';
     }

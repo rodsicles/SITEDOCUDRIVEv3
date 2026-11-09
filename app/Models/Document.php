@@ -163,7 +163,7 @@ class Document extends Model
             return false;
         }
 
-        if ($user->isDean() || $user->isSecretary()) {
+        if ($user->isDeanOrSecretary()) {
             return true;
         }
 
@@ -178,7 +178,7 @@ class Document extends Model
         if ($user->isProgramCoordinator()) {
             $uploader = $this->relationLoaded('uploader') ? $this->uploader : $this->uploader()->with('employee')->first();
 
-            if ($uploader && ($uploader->isFaculty() || (int) $uploader->role_id === 3)) {
+            if ($uploader && $uploader->isFaculty()) {
                 return \App\Support\CoordinatorDepartment::handles($user, optional($uploader->employee)->program);
             }
 
@@ -228,8 +228,7 @@ class Document extends Model
     public function canManageVersions(User $user): bool
     {
         return (int) $this->uploaded_by === (int) $user->id
-            || $user->isDean()
-            || $user->isSecretary();
+            || $user->isDeanOrSecretary();
     }
 
     public function searchIndex()
@@ -249,6 +248,7 @@ class Document extends Model
 
         return match ($role) {
             'Dean' => 'Requested by Dean',
+            'Admin' => 'Requested by Admin',
             'Program Coordinator' => 'Requested by Coordinator',
             default => $submission ? 'Requested document' : null,
         };
@@ -285,7 +285,7 @@ class Document extends Model
                 ->orWhereHas('folder', fn ($folder) => $folder->visibleTo($user));
         });
 
-        if ($user->isDean() || $user->isSecretary()) {
+        if ($user->isDeanOrSecretary()) {
             return $query;
         }
 
@@ -313,7 +313,7 @@ class Document extends Model
                     $broadcast->whereIn('category', self::SHAREABLE_CATEGORIES)
                         ->whereDoesntHave('recipients')
                         ->whereHas('uploader', fn ($u) => $u->whereHas('role', function ($roleQ) {
-                            $roleQ->whereIn('role_name', ['Dean', 'Secretary', 'Program Coordinator']);
+                            $roleQ->whereIn('role_name', ['Dean', 'Secretary', 'Program Coordinator', 'Admin']);
                         }));
                 });
         });

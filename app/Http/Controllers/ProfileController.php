@@ -16,7 +16,7 @@ class ProfileController extends Controller
     {
         $user = auth()->user();
         $employee = $user->employee;
-        $canEditFullName = $user->isDean() || $user->isProgramCoordinator();
+        $canEditFullName = $user->hasOversightAccess() || $user->isProgramCoordinator();
         $canEditEmployeeNo = $user->isDean();
         $teachingAssignments = $user->isFaculty() || $user->isProgramCoordinator()
             ? app(\App\Services\TeachingAssignmentService::class)->current($user)
@@ -29,7 +29,7 @@ class ProfileController extends Controller
     {
         $user = auth()->user();
         $employee = $user->employee;
-        $canEditFullName = $user->isDean() || $user->isProgramCoordinator();
+        $canEditFullName = $user->hasOversightAccess() || $user->isProgramCoordinator();
         $canEditEmployeeNo = $user->isDean();
 
         $rules = [

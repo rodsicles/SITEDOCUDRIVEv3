@@ -96,7 +96,7 @@ Route::middleware(['auth', 'no.back'])->prefix('archive-contents/{year}')->name(
 });
 
 // Teaching Guides: open or create subject folder (TG/LB) from semester picker
-Route::middleware(['auth', 'no.back', 'role:Dean,Program Coordinator,Faculty Employee'])->prefix('teacher-loads')->name('teacher-loads.')->group(function () {
+Route::middleware(['auth', 'no.back', 'role:Dean,Admin,Program Coordinator,Faculty Employee'])->prefix('teacher-loads')->name('teacher-loads.')->group(function () {
     $controller = \App\Http\Controllers\TeacherLoadController::class;
     Route::get('/', [$controller, 'index'])->name('index');
     Route::get('/options', [$controller, 'options'])->name('options');
@@ -111,7 +111,7 @@ Route::middleware(['auth', 'no.back', 'role:Dean,Program Coordinator,Faculty Emp
     Route::get('/{id}/pdf', [$controller, 'export'])->whereNumber('id')->middleware('throttle:30,1')->name('pdf');
 });
 
-Route::middleware(['auth', 'no.back', 'role:Dean,Program Coordinator'])->prefix('course-sections')->name('course-sections.')->group(function () {
+Route::middleware(['auth', 'no.back', 'role:Dean,Admin,Program Coordinator'])->prefix('course-sections')->name('course-sections.')->group(function () {
     Route::post('/', [\App\Http\Controllers\CourseSectionController::class, 'store'])->name('store');
     Route::patch('/{id}', [\App\Http\Controllers\CourseSectionController::class, 'update'])->name('update');
     Route::patch('/{id}/status', [\App\Http\Controllers\CourseSectionController::class, 'status'])->name('status');
@@ -164,8 +164,8 @@ Route::middleware(['auth', 'no.back'])->prefix('announcements')->name('announcem
         ->name('receipts');
 
 
-    // Only Dean and Coordinator can create/edit/delete announcements
-    Route::middleware('role:Dean,Program Coordinator')->group(function () {
+    // Only Dean, Admin and Coordinator can create/edit/delete announcements
+    Route::middleware('role:Dean,Admin,Program Coordinator')->group(function () {
         Route::get('/create', [AnnouncementController::class, 'create'])->name('create');
         Route::post('/', [AnnouncementController::class, 'store'])->middleware('throttle:10,60')->name('store');
         Route::get('/{id}/edit', [AnnouncementController::class, 'edit'])->name('edit');
@@ -197,10 +197,11 @@ Route::middleware(['auth', 'no.back'])->prefix('reports')->name('reports.')->gro
     Route::get('/{id}/download', [ReportController::class, 'download'])->middleware('throttle:30,1')->name('download');
 });
 
-// Password Reset Requests (Dean + Secretary review queue). Kept outside the
+// Password Reset Requests (Dean + Secretary + Admin review queue). Kept outside the
 // dean.* group so the URL stays generic (/password-reset-requests) and can be
-// linked to from both sidebars without prefix surprises.
-Route::middleware(['auth', 'no.back', 'role:Dean,Secretary'])
+// linked to from every sidebar without prefix surprises. Who may handle which
+// request is enforced in PasswordResetRequestService::canHandle().
+Route::middleware(['auth', 'no.back', 'role:Dean,Secretary,Admin'])
     ->prefix('password-reset-requests')
     ->name('password-reset-requests.')
     ->group(function () {
@@ -213,20 +214,23 @@ Route::middleware(['auth', 'no.back', 'role:Dean,Secretary'])
             ->name('deny');
     });
 
-// Dean + Secretary Routes (Secretary has same access as Dean)
-Route::middleware(['auth', 'no.back', 'role:Dean,Secretary'])->prefix('dean')->name('dean.')->group(function () {
+// Dean office routes: Dean, Secretary and Admin. Routes marked 'role:Dean,Secretary'
+// (or checked with isDean() in the controller) stay unavailable to Admin.
+Route::middleware(['auth', 'no.back', 'role:Dean,Secretary,Admin'])->prefix('dean')->name('dean.')->group(function () {
     Route::get('/dashboard', [DeanController::class, 'dashboard'])->name('dashboard');
     Route::get('/employees', [DeanController::class, 'employees'])->name('employees');
     Route::get('/employees/{id}/profile', [DeanController::class, 'viewEmployeeProfile'])->name('employee-profile');
 
     // Account Management
-    Route::post('/accounts/coordinator', [DeanController::class, 'storeCoordinator'])->middleware('throttle:10,60')->name('store-coordinator');
+    Route::post('/accounts/coordinator', [DeanController::class, 'storeCoordinator'])->middleware(['throttle:10,60', 'role:Dean,Secretary'])->name('store-coordinator');
+    Route::post('/accounts/admin', [DeanController::class, 'storeAdmin'])->middleware(['throttle:10,60', 'role:Dean'])->name('store-admin');
+    Route::post('/accounts/{id}/temporary-password', [DeanController::class, 'issueTemporaryPassword'])->middleware('throttle:10,1')->name('temporary-password');
     Route::post('/accounts/faculty', [DeanController::class, 'storeFaculty'])->middleware('throttle:10,60')->name('store-faculty');
     Route::get('/accounts/{id}/edit', [DeanController::class, 'editEmployee'])->name('edit-employee');
     Route::patch('/accounts/{id}', [DeanController::class, 'updateEmployee'])->middleware('throttle:10,60')->name('update-employee');
     Route::post('/accounts/{id}/deactivate', [DeanController::class, 'deactivateEmployee'])->middleware('throttle:10,60')->name('deactivate-employee');
     Route::post('/accounts/{id}/reactivate', [DeanController::class, 'reactivateEmployee'])->middleware('throttle:10,60')->name('reactivate-employee');
-    Route::post('/accounts/{id}/permanent-delete', [DeanController::class, 'destroyEmployee'])->middleware('throttle:5,60')->name('destroy-employee');
+    Route::post('/accounts/{id}/permanent-delete', [DeanController::class, 'destroyEmployee'])->middleware(['throttle:5,60', 'role:Dean,Secretary'])->name('destroy-employee');
     Route::post('/accounts/{id}/reset-password', [DeanController::class, 'resetEmployeePassword'])->middleware('throttle:5,1')->name('reset-password');
 
     Route::get('/courses/by-department', [\App\Http\Controllers\DeanController::class, 'coursesByDepartment'])->name('courses.by-department');
@@ -272,15 +276,18 @@ Route::middleware(['auth', 'no.back', 'role:Dean,Secretary'])->prefix('dean')->n
     Route::get('/documents/{id}/view', [DeanController::class, 'viewDocument'])->name('view-document');
     Route::get('/documents/{id}/download', [DeanController::class, 'downloadDocument'])->name('download-document');
     Route::delete('/documents/{id}', [DeanController::class, 'deleteDocument'])->name('delete-document');
-    Route::delete('/documents/{id}/permanent-delete', [RecycleBinController::class, 'forceDeleteActive'])->middleware('throttle:10,60')->name('documents.force-delete');
-    Route::get('/documents/{id}/delete-impact', [RecycleBinController::class, 'deleteImpact'])->name('documents.delete-impact');
+    Route::delete('/documents/{id}/permanent-delete', [RecycleBinController::class, 'forceDeleteActive'])->middleware(['throttle:10,60', 'role:Dean,Secretary'])->name('documents.force-delete');
+    Route::get('/documents/{id}/delete-impact', [RecycleBinController::class, 'deleteImpact'])->middleware('role:Dean,Secretary')->name('documents.delete-impact');
     Route::patch('/documents/{id}/rename', [DeanController::class, 'renameDocument'])->middleware('throttle:60,1')->name('rename-document');
     Route::post('/documents/{id}/favorite', [DeanController::class, 'toggleFavorite'])->middleware('throttle:60,1')->name('toggle-favorite');
 
     Route::get('/recycle-bin', [RecycleBinController::class, 'index'])->name('recycle-bin.index');
     Route::post('/recycle-bin/{id}/restore', [RecycleBinController::class, 'restore'])->middleware('throttle:60,1')->name('recycle-bin.restore');
-    Route::delete('/recycle-bin/{id}', [RecycleBinController::class, 'forceDelete'])->middleware('throttle:60,1')->name('recycle-bin.force-delete');
-    Route::post('/recycle-bin/bulk-force-delete', [RecycleBinController::class, 'bulkForceDelete'])->middleware('throttle:10,1')->name('recycle-bin.bulk-force-delete');
+    Route::delete('/recycle-bin/{id}', [RecycleBinController::class, 'forceDelete'])->middleware(['throttle:60,1', 'role:Dean,Secretary'])->name('recycle-bin.force-delete');
+    Route::post('/recycle-bin/bulk-force-delete', [RecycleBinController::class, 'bulkForceDelete'])->middleware(['throttle:10,1', 'role:Dean,Secretary'])->name('recycle-bin.bulk-force-delete');
+
+    // Rejected Teaching Guides / Exam Questionnaires across all programs (Dean + Admin oversight)
+    Route::get('/rejected-files', [\App\Http\Controllers\RejectedFilesController::class, 'index'])->middleware('role:Dean,Admin')->name('rejected-files.index');
 
     // Folder Management - Rate Limited: 3 folders per hour
     Route::post('/folders', [FolderController::class, 'store'])->middleware('throttle:30,60')->name('folders.store');
@@ -291,12 +298,14 @@ Route::middleware(['auth', 'no.back', 'role:Dean,Secretary'])->prefix('dean')->n
     Route::post('/documents/{document}/copy', [FolderController::class, 'copyDocument'])->middleware('throttle:30,1')->name('documents.copy');
     Route::post('/documents/{document}/version', [\App\Http\Controllers\DocumentVersionController::class, 'store'])->middleware('throttle:10,60')->name('documents.version');
 
-    // Backup & Restore - rate limited because operations are destructive / heavy
-    Route::get('/backup', [BackupController::class, 'index'])->name('backup');
-    Route::post('/backup/create', [BackupController::class, 'create'])->middleware('throttle:3,60')->name('backup.create');
-    Route::get('/backup/download/{filename}', [BackupController::class, 'download'])->middleware('throttle:20,60')->name('backup.download');
-    Route::post('/backup/restore', [BackupController::class, 'restore'])->middleware('throttle:2,60')->name('backup.restore');
-    Route::delete('/backup/{filename}', [BackupController::class, 'destroy'])->middleware('throttle:10,60')->name('backup.destroy');
+    // Backup & Restore - rate limited because operations are destructive / heavy (not available to Admin)
+    Route::middleware('role:Dean,Secretary')->group(function () {
+        Route::get('/backup', [BackupController::class, 'index'])->name('backup');
+        Route::post('/backup/create', [BackupController::class, 'create'])->middleware('throttle:3,60')->name('backup.create');
+        Route::get('/backup/download/{filename}', [BackupController::class, 'download'])->middleware('throttle:20,60')->name('backup.download');
+        Route::post('/backup/restore', [BackupController::class, 'restore'])->middleware('throttle:2,60')->name('backup.restore');
+        Route::delete('/backup/{filename}', [BackupController::class, 'destroy'])->middleware('throttle:10,60')->name('backup.destroy');
+    });
 
     // Teaching Guides (Dean + Secretary can upload, approve, reject, delete)
     Route::get('/teaching-guides', [TeachingGuideController::class, 'index'])->name('teaching-guides.index');
@@ -316,10 +325,10 @@ Route::middleware(['auth', 'no.back', 'role:Dean,Secretary'])->prefix('dean')->n
 
     // Archives (Dean manages + browses)
     Route::get('/archives', [SchoolYearController::class, 'index'])->name('archives.index');
-    Route::post('/archives', [SchoolYearController::class, 'archive'])->middleware('throttle:5,60')->name('archives.archive');
+    Route::post('/archives', [SchoolYearController::class, 'archive'])->middleware(['throttle:5,60', 'role:Dean,Secretary'])->name('archives.archive');
     Route::get('/archives/list', [SchoolYearController::class, 'list'])->name('archives.list');
-    Route::post('/archives/{id}/restore', [SchoolYearController::class, 'restoreArchived'])->middleware('throttle:3,60')->name('archives.restore');
-    Route::post('/archives/{id}/permanent-delete', [SchoolYearController::class, 'destroyArchived'])->middleware('throttle:3,60')->name('archives.destroy');
+    Route::post('/archives/{id}/restore', [SchoolYearController::class, 'restoreArchived'])->middleware(['throttle:3,60', 'role:Dean,Secretary'])->name('archives.restore');
+    Route::post('/archives/{id}/permanent-delete', [SchoolYearController::class, 'destroyArchived'])->middleware(['throttle:3,60', 'role:Dean,Secretary'])->name('archives.destroy');
     Route::get('/archives/{id}', [SchoolYearController::class, 'show'])->name('archives.show');
 });
 
