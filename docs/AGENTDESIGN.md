@@ -64,7 +64,7 @@ Font stack: Segoe UI, Tahoma, Geneva, Verdana, system sans-serif.
 Dean Analytics places a compact Monthly history section before the live metrics. The close action saves the previous calendar month as a snapshot; its confirmation explicitly says live figures are unchanged. Document rows expose Recycle Bin and Dean-only permanent deletion as separate destructive actions with clear confirmation.
 
 - Layout: `resources/views/layouts/dashboard.blade.php`
-- Role sidebars: `partials/dean-sidebar.blade.php` (Dean **and Admin**; Rejected Files link is shown to both), `coordinator-sidebar.blade.php`, `faculty-sidebar.blade.php`, `secretary-sidebar.blade.php`. Pages that pick a sidebar use `hasOversightAccess()` / `isDeanOrSecretary()` rather than `isDean()` so Admin gets the Dean chrome. The Password Resets badge counts only requests the viewer may handle.
+- Role sidebars: `partials/dean-sidebar.blade.php` (Dean, **Secretary**, and **Admin**; `secretary-sidebar.blade.php` now just includes it). Faculty open the shared request modal with the title "Request a document from the Secretary", Secretary-only recipients, and only the General Document category. `coordinator-sidebar.blade.php`, `faculty-sidebar.blade.php`, `secretary-sidebar.blade.php`. Pages that pick a sidebar use `hasOversightAccess()` / `isDeanOrSecretary()` rather than `isDean()` so Admin gets the Dean chrome. The Password Resets badge counts only requests the viewer may handle.
 - Account/photo: `partials/sidebar-account.blade.php`
 
 Dark green grouped sidebar, account controls at the bottom, consistent page title and utilities. Workspace is pale green-gray, content on white. Use compact statistic strips and readable tables — not a card around every number.

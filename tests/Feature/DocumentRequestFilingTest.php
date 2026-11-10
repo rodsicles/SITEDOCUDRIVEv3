@@ -62,7 +62,9 @@ class DocumentRequestFilingTest extends TestCase
         $person->update(['status' => 'Inactive']);
         $this->assertFalse(collect($this->getJson(route('document-requests.recipients'))->assertOk()->json('people'))->pluck('id')->contains($person->id));
 
-        $this->actingAs(User::where('username', 'faculty')->firstOrFail())->getJson(route('document-requests.recipients'))->assertForbidden();
+        // Faculty may request documents from the Secretary only.
+        $facultyPeople = collect($this->actingAs(User::where('username', 'faculty')->firstOrFail())->getJson(route('document-requests.recipients'))->assertOk()->json('people'));
+        $this->assertSame([User::where('username', 'secretary')->value('id')], $facultyPeople->pluck('id')->all());
     }
 
     public function test_recipient_refresh_honors_coordinator_home_and_extra_programs(): void

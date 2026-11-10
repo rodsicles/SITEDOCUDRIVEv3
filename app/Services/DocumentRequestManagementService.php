@@ -13,13 +13,30 @@ class DocumentRequestManagementService
 {
     public function authorize(User $actor, DocumentRequest $item): void
     {
-        abort_unless(($actor->hasOversightAccess() || $actor->isProgramCoordinator()) && (int) $item->requested_by === (int) $actor->id, 403);
+        abort_unless(self::canCreateRequests($actor) && (int) $item->requested_by === (int) $actor->id, 403);
     }
 
+    /** Dean office and Coordinators request from anyone in scope; Faculty request documents from the Secretary. */
+    public static function canCreateRequests(User $actor): bool
+    {
+        return $actor->hasOversightAccess() || $actor->isProgramCoordinator() || $actor->isFaculty();
+    }
+
+    /**
+     * Who the actor may send a request to:
+     * Faculty → active Secretaries only; Coordinator → their handled programs plus Secretaries;
+     * Dean/Secretary/Admin → every active account except themselves.
+     */
     public function eligiblePeople(User $actor)
     {
+        $isSecretary = fn ($q) => $q->whereHas('role', fn ($r) => $r->where('role_name', \App\Models\Role::SECRETARY));
+
         return User::where('status', 'Active')->whereKeyNot($actor->id)->with(['employee', 'role'])
-            ->when($actor->isProgramCoordinator(), fn ($q) => $q->whereHas('employee', fn ($e) => $e->whereIn('program', CoordinatorDepartment::requirePrograms($actor))));
+            ->when($actor->isFaculty(), $isSecretary)
+            ->when($actor->isProgramCoordinator(), function ($q) use ($actor, $isSecretary) {
+                $programs = CoordinatorDepartment::requirePrograms($actor);
+                $q->where(fn ($scope) => $scope->whereHas('employee', fn ($e) => $e->whereIn('program', $programs))->orWhere($isSecretary));
+            });
     }
 
     public function apply(User $actor, DocumentRequest $item, array $input): DocumentRequest

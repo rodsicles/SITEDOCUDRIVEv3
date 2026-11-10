@@ -181,13 +181,14 @@ class User extends Authenticatable
     }
 
     /**
-     * Dean or Admin: day-to-day oversight across every program (Teacher's Load,
-     * course sections, document requests, announcements). Dean-only actions
-     * such as backups, purges and school-year archiving keep using isDean().
+     * Dean, Secretary or Admin: day-to-day oversight across every program (Teacher's Load,
+     * course sections, document requests, announcements, Rejected Files, full activity log).
+     * Dean-only actions (analytics/activity resets, Recycle Bin permanent delete, Admin
+     * accounts, Dean password requests) keep using isDean().
      */
     public function hasOversightAccess(): bool
     {
-        return $this->isDean() || $this->isAdmin();
+        return $this->isDean() || $this->isSecretary() || $this->isAdmin();
     }
 
     /**

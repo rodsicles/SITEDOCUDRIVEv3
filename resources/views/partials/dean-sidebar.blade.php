@@ -1,4 +1,4 @@
-{{-- Consistent Dean Sidebar - Appears on ALL Dean and Admin pages --}}
+{{-- Consistent Dean office sidebar - Dean, Secretary and Admin pages --}}
 @php
     try {
         $pendingResetCount = app(\App\Services\PasswordResetRequestService::class)

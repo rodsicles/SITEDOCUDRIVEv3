@@ -41,7 +41,8 @@ class AdminRoleTest extends TestCase
         $this->assertTrue($admin->hasOversightAccess());
         $this->assertTrue($admin->isDeanOrSecretary());
         $this->assertFalse($admin->isDean());
-        $this->assertFalse($this->fixture('secretary')->hasOversightAccess());
+        $this->assertTrue($this->fixture('secretary')->hasOversightAccess());
+        $this->assertFalse($this->fixture('secretary')->isDean());
     }
 
     public function test_admin_can_open_daily_oversight_pages(): void
@@ -74,8 +75,8 @@ class AdminRoleTest extends TestCase
         $this->actingAs($this->fixture('secretary'));
 
         $this->get(route('dean.backup'))->assertOk();
+        $this->get(route('dean.rejected-files.index'))->assertOk();
         $this->post(route('dean.store-admin'), [])->assertForbidden();
-        $this->get(route('dean.rejected-files.index'))->assertForbidden();
     }
 
     public function test_admin_creates_and_manages_faculty_but_not_coordinators_dean_or_admins(): void

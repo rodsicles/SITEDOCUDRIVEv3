@@ -365,10 +365,19 @@
 @endif
 
 {{-- ===== ANALYTICS (Coordinator / Dean / Secretary) ===== --}}
-@if($isDean || $isCoordinator || $isFaculty)
+@if($isDean || $isCoordinator || $isFaculty || $isSecretary || $isAdmin)
 <div id="guide-corrections" class="content-card">
     <div class="card-header"><h3 class="card-title">Teaching loads and request corrections</h3></div>
-    @if($isDean || $isCoordinator)
+    <ol class="guide-steps">
+        @if($isFaculty)
+        <li><strong>Need a file from the Secretary</strong> (e.g. a certificate or memo)? Open <strong>Document Requests → New request</strong>, choose the Secretary, describe the file, and send. You will be notified when it is uploaded; open it under <strong>Sent</strong>, then <strong>Approve</strong> or <strong>Request changes</strong>.</li>
+        @elseif($isSecretary)
+        <li>Requests sent to you appear under <strong>Document Requests → Received</strong>. Click <strong>Submit document</strong> to upload the requested file; only the requester and the Dean office can open it. If the requester asks for changes, upload a corrected file the same way.</li>
+        @else
+        <li>To get a file from the Dean office, choose a <strong>Secretary</strong> as the recipient of a General Document request. They upload it for you under your <strong>Sent</strong> requests.</li>
+        @endif
+    </ol>
+    @if($isDean || $isCoordinator || $isSecretary || $isAdmin)
         <ol class="guide-steps">
             <li>In <strong>Teacher's Load</strong>, choose <strong>Revise</strong> on a published load and enter a reason. Edit/save the revision, preview it, then finalize. The employee keeps seeing the published schedule until finalization.</li>
             <li>Use <strong>History</strong> to download earlier published revisions. <strong>Void</strong> withdraws a load while retaining its history; <strong>Prepare replacement</strong> starts a new revision. Only unpublished drafts can be deleted.</li>

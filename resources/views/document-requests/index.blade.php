@@ -9,8 +9,6 @@
         @include('partials.coordinator-sidebar')
     @elseif(auth()->user()->isFaculty())
         @include('partials.faculty-sidebar')
-    @elseif(auth()->user()->isSecretary())
-        @include('partials.secretary-sidebar')
     @else
         @include('partials.dean-sidebar')
     @endif
@@ -114,7 +112,7 @@
 @if($canCreateRequests)
 <div id="createRequestModal" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="createRequestTitle">
     <div class="modal-card modal-card--wide request-modal">
-        <div class="modal-header"><div><h2 id="createRequestTitle" class="modal-title">New document request</h2><p>Assign one requirement to one or more employees.</p></div><button type="button" class="modal-close" data-close-modal><i class="fas fa-times"></i></button></div>
+        <div class="modal-header"><div><h2 id="createRequestTitle" class="modal-title">{{ $viewer->isFaculty() ? 'Request a document from the Secretary' : 'New document request' }}</h2><p>{{ $viewer->isFaculty() ? 'Choose a Secretary and describe the file you need. They will upload it for you here.' : 'Assign one requirement to one or more employees. Choose a Secretary to request a file from the Dean office.' }}</p></div><button type="button" class="modal-close" data-close-modal><i class="fas fa-times"></i></button></div>
         <form id="createDocumentRequestForm" method="POST" action="{{ route('document-requests.store') }}">@csrf
             <div class="modal-body request-form-grid">
                 @if($errors->any() && old('request_category') !== null)
@@ -136,7 +134,7 @@
                 </fieldset>
                 <div class="form-group"><label class="form-label">Accepted file type *</label><select id="requestDocumentType" class="form-control" name="document_type" required><option value="any" @selected(old('document_type', 'any') === 'any')>PDF, Word, or image</option><option value="pdf" @selected(old('document_type') === 'pdf')>PDF only</option><option value="word" @selected(old('document_type') === 'word')>Word only</option><option value="image" @selected(old('document_type') === 'image')>Image only</option></select></div>
                 <div class="form-group"><label class="form-label" for="requestDueAt">Due date &amp; time (optional)</label><input id="requestDueAt" class="form-control" type="datetime-local" name="due_at" value="{{ old('due_at') }}" min="{{ now()->addMinute()->format('Y-m-d\TH:i') }}" aria-describedby="requestDueHint requestDueError" @error('due_at') aria-invalid="true" @enderror><small id="requestDueHint">{{ config('app.timezone') }} time. Choose a future date and time, or leave blank for no deadline.</small><small id="requestDueError" class="request-field-error" role="alert" @if(!$errors->has('due_at')) hidden @endif>{{ $errors->first('due_at') }}</small></div>
-                <div class="form-group request-form-wide"><label class="form-label" for="requestCategory">Request category *</label><select id="requestCategory" class="form-control" name="request_category" required><option value="general" @selected(old('request_category', 'general') === 'general')>General Document</option><option value="teaching_guide" @selected(old('request_category') === 'teaching_guide')>Teaching Guide</option><option value="exam_questionnaire" @selected(old('request_category') === 'exam_questionnaire')>Exam Questionnaire</option></select><small id="requestCategoryHint" class="text-xs text-gray-500">General documents are filed in Uncategorized Files and marked with their request origin.</small></div>
+                <div class="form-group request-form-wide"><label class="form-label" for="requestCategory">Request category *</label><select id="requestCategory" class="form-control" name="request_category" required><option value="general" @selected(old('request_category', 'general') === 'general')>General Document</option>@unless($viewer->isFaculty())<option value="teaching_guide" @selected(old('request_category') === 'teaching_guide')>Teaching Guide</option><option value="exam_questionnaire" @selected(old('request_category') === 'exam_questionnaire')>Exam Questionnaire</option>@endunless</select><small id="requestCategoryHint" class="text-xs text-gray-500">General documents are filed in Uncategorized Files and marked with their request origin.</small></div>
                 <input id="requestCourseId" type="hidden" name="course_id" value="{{ old('course_id') }}">
                 <input id="requestSchoolYearId" type="hidden" name="school_year_id" value="{{ old('school_year_id') }}">
                 <input id="requestSemesterValue" type="hidden" name="semester" value="{{ old('semester') }}">

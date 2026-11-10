@@ -96,7 +96,7 @@ Route::middleware(['auth', 'no.back'])->prefix('archive-contents/{year}')->name(
 });
 
 // Teaching Guides: open or create subject folder (TG/LB) from semester picker
-Route::middleware(['auth', 'no.back', 'role:Dean,Admin,Program Coordinator,Faculty Employee'])->prefix('teacher-loads')->name('teacher-loads.')->group(function () {
+Route::middleware(['auth', 'no.back', 'role:Dean,Secretary,Admin,Program Coordinator,Faculty Employee'])->prefix('teacher-loads')->name('teacher-loads.')->group(function () {
     $controller = \App\Http\Controllers\TeacherLoadController::class;
     Route::get('/', [$controller, 'index'])->name('index');
     Route::get('/options', [$controller, 'options'])->name('options');
@@ -111,7 +111,7 @@ Route::middleware(['auth', 'no.back', 'role:Dean,Admin,Program Coordinator,Facul
     Route::get('/{id}/pdf', [$controller, 'export'])->whereNumber('id')->middleware('throttle:30,1')->name('pdf');
 });
 
-Route::middleware(['auth', 'no.back', 'role:Dean,Admin,Program Coordinator'])->prefix('course-sections')->name('course-sections.')->group(function () {
+Route::middleware(['auth', 'no.back', 'role:Dean,Secretary,Admin,Program Coordinator'])->prefix('course-sections')->name('course-sections.')->group(function () {
     Route::post('/', [\App\Http\Controllers\CourseSectionController::class, 'store'])->name('store');
     Route::patch('/{id}', [\App\Http\Controllers\CourseSectionController::class, 'update'])->name('update');
     Route::patch('/{id}/status', [\App\Http\Controllers\CourseSectionController::class, 'status'])->name('status');
@@ -164,8 +164,8 @@ Route::middleware(['auth', 'no.back'])->prefix('announcements')->name('announcem
         ->name('receipts');
 
 
-    // Only Dean, Admin and Coordinator can create/edit/delete announcements
-    Route::middleware('role:Dean,Admin,Program Coordinator')->group(function () {
+    // Only Dean, Secretary, Admin and Coordinator can create/edit/delete announcements
+    Route::middleware('role:Dean,Secretary,Admin,Program Coordinator')->group(function () {
         Route::get('/create', [AnnouncementController::class, 'create'])->name('create');
         Route::post('/', [AnnouncementController::class, 'store'])->middleware('throttle:10,60')->name('store');
         Route::get('/{id}/edit', [AnnouncementController::class, 'edit'])->name('edit');
@@ -286,8 +286,8 @@ Route::middleware(['auth', 'no.back', 'role:Dean,Secretary,Admin'])->prefix('dea
     Route::delete('/recycle-bin/{id}', [RecycleBinController::class, 'forceDelete'])->middleware(['throttle:60,1', 'role:Dean,Secretary'])->name('recycle-bin.force-delete');
     Route::post('/recycle-bin/bulk-force-delete', [RecycleBinController::class, 'bulkForceDelete'])->middleware(['throttle:10,1', 'role:Dean,Secretary'])->name('recycle-bin.bulk-force-delete');
 
-    // Rejected Teaching Guides / Exam Questionnaires across all programs (Dean + Admin oversight)
-    Route::get('/rejected-files', [\App\Http\Controllers\RejectedFilesController::class, 'index'])->middleware('role:Dean,Admin')->name('rejected-files.index');
+    // Rejected Teaching Guides / Exam Questionnaires across all programs (Dean, Secretary, Admin oversight)
+    Route::get('/rejected-files', [\App\Http\Controllers\RejectedFilesController::class, 'index'])->name('rejected-files.index');
 
     // Folder Management - Rate Limited: 3 folders per hour
     Route::post('/folders', [FolderController::class, 'store'])->middleware('throttle:30,60')->name('folders.store');

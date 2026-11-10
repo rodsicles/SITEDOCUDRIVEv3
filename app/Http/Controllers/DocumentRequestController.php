@@ -52,7 +52,7 @@ class DocumentRequestController extends Controller
         }
 
         $requests = $query->orderByRaw('CASE WHEN due_at IS NULL THEN 1 ELSE 0 END')->orderBy('due_at')->latest('id')->paginate(20)->withQueryString();
-        $canCreateRequests = $user->hasOversightAccess() || $user->isProgramCoordinator();
+        $canCreateRequests = \App\Services\DocumentRequestManagementService::canCreateRequests($user);
         $people = $canCreateRequests ? app(\App\Services\DocumentRequestManagementService::class)->eligiblePeople($user)
             ->with(['assignedCourses' => fn ($query) => $query->active()->ordered()])->orderBy('username')->get() : collect();
         $courses = Course::active()->ordered()->get();
@@ -71,7 +71,7 @@ class DocumentRequestController extends Controller
 
     public function recipients(Request $request)
     {
-        abort_unless($request->user()->hasOversightAccess() || $request->user()->isProgramCoordinator(), 403);
+        abort_unless(\App\Services\DocumentRequestManagementService::canCreateRequests($request->user()), 403);
         $people = app(\App\Services\DocumentRequestManagementService::class)->eligiblePeople($request->user())
             ->with(['assignedCourses' => fn ($query) => $query->active()->ordered()])->orderBy('username')->get();
 
@@ -87,7 +87,7 @@ class DocumentRequestController extends Controller
 
     public function store(Request $request)
     {
-        abort_unless($request->user()->hasOversightAccess() || $request->user()->isProgramCoordinator(), 403, 'Only the Dean, Admin, and program coordinators can create document requests.');
+        abort_unless(\App\Services\DocumentRequestManagementService::canCreateRequests($request->user()), 403, 'Your account cannot create document requests.');
 
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:150'],
@@ -113,15 +113,21 @@ class DocumentRequestController extends Controller
         $recipientIds = collect($validated['recipient_ids'])->map(fn ($id) => (int) $id)->unique()->reject(fn ($id) => $id === (int) $request->user()->id);
         abort_if($recipientIds->isEmpty(), 422, 'Choose at least one other employee.');
 
-        if ($request->user()->isProgramCoordinator()) {
-            $programs = \App\Support\CourseCatalog::programsForUser($request->user());
-            $accessibleCount = User::query()
+        // Faculty and Coordinators are limited to eligiblePeople() (Faculty: Secretaries only).
+        if ($request->user()->isProgramCoordinator() || $request->user()->isFaculty()) {
+            $accessibleCount = app(\App\Services\DocumentRequestManagementService::class)
+                ->eligiblePeople($request->user())
                 ->whereIn('id', $recipientIds)
-                ->whereHas('employee', fn ($query) => $query->whereIn('program', $programs))
                 ->count();
             if ($accessibleCount !== $recipientIds->count()) {
-                throw ValidationException::withMessages(['recipient_ids' => 'Choose recipients from the programs you handle only.']);
+                throw ValidationException::withMessages(['recipient_ids' => $request->user()->isFaculty()
+                    ? 'Faculty can request documents from the Secretary only.'
+                    : 'Choose recipients from the programs you handle or the Secretary.']);
             }
+        }
+
+        if ($request->user()->isFaculty() && $validated['request_category'] !== 'general') {
+            throw ValidationException::withMessages(['request_category' => 'Requests to the Secretary use the General Document category.']);
         }
 
         if ($validated['request_category'] === 'general') {
